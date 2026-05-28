@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cyber Snake 3D - 霓虹超視覺 3D 貪食蛇</title>
+  <!-- Tailwind CSS 適用於極速、現代化的 UI 建構 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 載入未來感與街機風格的 Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Orbitron', 'Share Tech Mono', sans-serif;
+      background-color: #030308;
+      touch-action: none; /* 防止行動裝置預設的縮放與滾動 */
+    }
+    /* 玻璃擬態玻璃發光特效 */
+    .glassmorphism {
+      background: rgba(8, 8, 18, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 255, 204, 0.25);
+      box-shadow: 0 8px 32px 0 rgba(0, 255, 204, 0.15),
+                  inset 0 0 15px rgba(0, 255, 204, 0.08);
+    }
+    .neon-text-cyan {
+      text-shadow: 0 0 10px rgba(0, 255, 204, 0.8), 0 0 20px rgba(0, 255, 204, 0.4);
+    }
+    .neon-text-pink {
+      text-shadow: 0 0 10px rgba(255, 0, 127, 0.8), 0 0 20px rgba(255, 0, 127, 0.4);
+    }
+    .neon-border-pink {
+      box-shadow: 0 0 15px rgba(255, 0, 127, 0.45);
+      border-color: rgba(255, 0, 127, 0.6);
+    }
+    .neon-border-cyan {
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.45);
+      border-color: rgba(0, 255, 204, 0.6);
+    }
+    /* 隱藏滾動條 */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="text-white overflow-hidden select-none">
+
+  <!-- 3D 畫布容器 -->
+  <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+  <!-- HUD 頂部遊戲狀態欄 -->
+  <div id="hud" class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center pointer-events-none transition-opacity duration-500 opacity-0 gap-2">
+    <!-- 左側分數面板 (手機端自動縮小，隱藏輔助文字) -->
+    <div class="glassmorphism rounded-xl px-3 py-2 sm:px-5 sm:py-3 flex gap-3 sm:gap-6 items-center pointer-events-auto">
+      <div>
+        <div class="text-[8px] text-cyan-400 tracking-widest uppercase hidden sm:block">SCORE</div>
+        <div id="score" class="text-xl sm:text-3xl font-black text-white neon-text-cyan">0000</div>
+      </div>
+      <div class="h-6 sm:h-8 w-[1px] bg-cyan-500/30"></div>
+      <div>
+        <div class="text-[8px] text-pink-400 tracking-widest uppercase hidden sm:block">BEST</div>
+        <div id="best-score" class="text-sm sm:text-2xl font-bold text-white/80">0000</div>
+      </div>
+    </div>
+
+    <!-- 中間：連擊/倍率條 (手機端寬度自適應) -->
+    <div class="glassmorphism rounded-xl px-3 py-2 sm:px-5 sm:py-3 flex flex-col items-center min-w-[90px] sm:min-w-[150px] pointer-events-auto">
+      <div class="text-[8px] text-pink-400 tracking-widest uppercase mb-1 hidden sm:block font-bold">MULTIPLIER</div>
+      <div class="flex items-center gap-2 w-full justify-center sm:justify-start">
+        <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-pink-500/20 hidden sm:block">
+          <div id="combo-bar" class="bg-gradient-to-r from-pink-500 to-purple-500 h-full w-0 transition-all duration-100"></div>
+        </div>
+        <div id="multiplier" class="text-lg sm:text-xl font-bold text-pink-500 neon-text-pink">x1</div>
+      </div>
+    </div>
+
+    <!-- 右側功能按鈕與相機視角控制 (手機端僅顯示圖示，防止折行) -->
+    <div class="flex gap-1.5 sm:gap-2 pointer-events-auto">
+      <button id="btn-camera-mode" class="glassmorphism hover:bg-cyan-500/10 active:scale-95 transition px-2.5 py-2 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <span class="hidden sm:inline">相機: 追蹤</span>
+      </button>
+      <button id="btn-bgm" class="glassmorphism hover:bg-pink-500/10 active:scale-95 transition px-2.5 py-2 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-pink-400 border border-pink-500/30 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+        </svg>
+        <span class="hidden sm:inline">音樂: 開</span>
+      </button>
+      <button id="btn-pause" class="glassmorphism hover:bg-cyan-500/10 active:scale-95 transition p-2.5 rounded-xl text-cyan-400 border border-cyan-500/30">
+        <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 開始選單畫面 -->
+  <div id="start-screen" class="absolute inset-0 z-20 flex flex-col justify-center items-center px-4 bg-gradient-to-b from-transparent to-[#03030a]/95 animate-fade-in">
+    <div class="glassmorphism rounded-3xl p-6 md:p-12 max-w-lg w-full text-center flex flex-col items-center gap-6 border-cyan-500/30">
+      <!-- 標題 -->
+      <div class="relative">
+        <h1 class="text-5xl md:text-6xl font-black tracking-wider uppercase text-white neon-text-cyan">CYBER</h1>
+        <h2 class="text-3xl md:text-4xl font-black tracking-widest uppercase text-pink-500 neon-text-pink -mt-1">SNAKE 3D</h2>
+        <div class="absolute -top-6 -right-6 text-[10px] text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded tracking-widest uppercase animate-pulse">V2.5 MAX</div>
+      </div>
+
+      <p class="text-gray-400 text-sm font-light leading-relaxed max-w-md">
+        全新終極修復版！場地擴大 4 倍，修正了鍵盤轉彎卡死問題，並融入專屬「開場、遊戲中、遊戲結束」三重實時合成主題音樂。
+      </p>
+
+      <!-- 說明 -->
+      <div class="w-full bg-black/40 rounded-xl p-4 text-left border border-white/5 flex flex-col gap-2">
+        <div class="text-xs text-cyan-400 tracking-wider font-bold">● 極簡相對控制設計</div>
+        <div class="grid grid-cols-2 gap-2 text-xs text-gray-300">
+          <div class="flex items-center gap-2"><span class="bg-cyan-500/20 px-2 py-0.5 rounded text-cyan-300 font-bold border border-cyan-500/30 font-sans">A</span> / <span class="bg-cyan-500/20 px-2 py-0.5 rounded text-cyan-300 font-bold border border-cyan-500/30 font-sans">←</span> 向左轉 90°</div>
+          <div class="flex items-center gap-2"><span class="bg-pink-500/20 px-2 py-0.5 rounded text-pink-300 font-bold border border-pink-500/30 font-sans">D</span> / <span class="bg-pink-500/20 px-2 py-0.5 rounded text-pink-300 font-bold border border-pink-500/30 font-sans">→</span> 向右轉 90°</div>
+          <div class="col-span-2 text-pink-400 mt-1">※ 已取消 W/S/↑/↓ 鍵（避免操作衝突）。轉向均以蛇頭目前朝向為基準。</div>
+        </div>
+      </div>
+
+      <!-- 按鈕 -->
+      <button id="btn-start" class="w-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-lg py-4 px-8 rounded-xl tracking-widest transition duration-300 uppercase active:scale-[0.98] neon-border-cyan">
+        啟動模擬系統
+      </button>
+    </div>
+  </div>
+
+  <!-- 暫停畫面 -->
+  <div id="pause-screen" class="absolute inset-0 z-20 flex justify-center items-center px-4 bg-black/60 backdrop-blur-md hidden">
+    <div class="glassmorphism rounded-3xl p-8 max-w-xs w-full text-center flex flex-col gap-5 border-cyan-500/30">
+      <h3 class="text-2xl font-black text-cyan-400 tracking-wider neon-text-cyan uppercase">SYSTEM PAUSED</h3>
+      <p class="text-xs text-gray-400 leading-relaxed">主控系統暫停，點擊下方按鈕以還原執行緒。</p>
+      <button id="btn-resume" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black py-3 px-6 rounded-xl tracking-widest transition duration-300 active:scale-95">
+        繼續模擬
+      </button>
+    </div>
+  </div>
+
+  <!-- 遊戲結束畫面 -->
+  <div id="gameover-screen" class="absolute inset-0 z-20 flex justify-center items-center px-4 bg-[#03030a]/85 backdrop-blur-sm hidden">
+    <div class="glassmorphism rounded-3xl p-8 md:p-10 max-w-sm w-full text-center flex flex-col gap-6 border-pink-500/30">
+      <div>
+        <h3 class="text-3xl font-black text-pink-500 tracking-wider neon-text-pink uppercase mb-1">SIMULATION END</h3>
+        <p class="text-[10px] text-pink-400/80 tracking-widest uppercase">系統核心碰撞崩潰</p>
+      </div>
+
+      <!-- 戰績卡 -->
+      <div class="bg-black/40 border border-pink-500/15 rounded-2xl p-4 flex flex-col gap-3">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-gray-400">最終獲得分數：</span>
+          <span id="go-score" class="text-xl font-bold text-cyan-400 neon-text-cyan">0000</span>
+        </div>
+        <div class="h-[1px] bg-white/5"></div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-gray-400">最高歷史紀錄：</span>
+          <span id="go-best" class="text-xl font-bold text-white">0000</span>
+        </div>
+        <div class="h-[1px] bg-white/5"></div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-gray-400">捕獲食物數量：</span>
+          <span id="go-crystals" class="text-sm font-bold text-pink-400">0</span>
+        </div>
+        <div class="h-[1px] bg-white/5"></div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-gray-400">最大連擊倍率：</span>
+          <span id="go-max-mult" class="text-sm font-bold text-pink-400">x1</span>
+        </div>
+      </div>
+
+      <button id="btn-restart" class="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-black text-base py-3 px-6 rounded-xl tracking-widest transition duration-300 uppercase active:scale-95 neon-border-pink">
+        重啟核心
+      </button>
+    </div>
+  </div>
+
+  <!-- 行動裝置左右相對轉向控制 (Ergonomic Console Layout - 完美掌機化布局) -->
+  <div id="touch-controls" class="fixed bottom-8 left-0 right-0 z-30 flex justify-between px-6 pointer-events-none lg:hidden hidden">
+    <!-- 左轉按鈕 (CCW 逆時針) - 位於左拇指自然落點，發散藍光 -->
+    <button id="ctrl-left" style="touch-action: none;" class="w-20 h-20 rounded-full glassmorphism pointer-events-auto flex flex-col items-center justify-center active:scale-90 active:bg-cyan-500/20 transition-all border-cyan-500/40 text-cyan-400 neon-border-cyan">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      <span class="text-[9px] font-bold mt-1 tracking-widest">左轉 ↺</span>
+    </button>
+    
+    <!-- 右轉按鈕 (CW 順時針) - 位於右拇指自然落點，發散粉光 -->
+    <button id="ctrl-right" style="touch-action: none;" class="w-20 h-20 rounded-full glassmorphism pointer-events-auto flex flex-col items-center justify-center active:scale-90 active:bg-pink-500/20 transition-all border-pink-500/40 text-pink-400 neon-border-pink">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+      </svg>
+      <span class="text-[9px] font-bold mt-1 tracking-widest">右轉 ↻</span>
+    </button>
+  </div>
+
+  <!-- 免責聲明 Footer -->
+  <div id="disclaimer-footer" class="absolute bottom-1 w-full text-center text-[8px] text-gray-600 font-sans tracking-wide z-10 pointer-events-none hidden sm:block">
+    免責聲明：本網頁與遊戲程式僅供個人娛樂、視覺效果與 3D 技術學術展示，不代表任何商業用途或營運保證。所有遊玩分數及數據僅儲存於本地瀏覽器暫存中。
+  </div>
+
+  <!-- 導入 GSAP 作為強大的平滑過渡補間動畫庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <!-- JS 核心邏輯 - 使用穩定度 100% 的 esm.sh 直接導入所有模組 -->
+  <script type="module">
+    import * as THREE from 'https://esm.sh/three@0.156.0';
+    import { EffectComposer } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/OutputPass.js';
+
+    // ==========================================
+    // 1. 頂級音效與三大主題音樂合成器 (純 Web Audio API)
+    // ==========================================
+    class SoundSystem {
+      constructor() {
+        this.ctx = null;
+        this.bgmEnabled = true;
+        
+        // 1. 開場音樂 (Opening Theme) - 溫柔悠揚的未來風琶音
+        this.openingBgmInterval = null;
+        this.openingChords = [
+          [220.00, 261.63, 329.63, 392.00], // Am7
+          [196.00, 246.94, 293.66, 392.00], // G
+          [174.61, 220.00, 261.63, 349.23], // Fmaj7
+          [164.81, 207.65, 246.94, 329.63]  // E7
+        ];
+        this.openingStep = 0;
+
+        // 2. 遊戲進行中音樂 (In-game Synthwave Bassline)
+        this.gameBgmInterval = null;
+        this.gameBgmNotes = [55.00, 55.00, 65.41, 65.41, 73.42, 73.42, 48.99, 48.99];
+        this.gameBgmStep = 0;
+      }
+
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      // 啟動開場主題音樂 (選單畫面)
+      startOpeningBgm() {
+        this.init();
+        if (!this.bgmEnabled || this.openingBgmInterval) return;
+        this.stopGameBgm();
+
+        this.openingStep = 0;
+        this.openingBgmInterval = setInterval(() => {
+          try {
+            const chordIndex = Math.floor(this.openingStep / 8) % this.openingChords.length;
+            const chord = this.openingChords[chordIndex];
+            const noteIndex = this.openingStep % chord.length;
+            const baseFreq = chord[noteIndex];
+
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const filter = this.ctx.createBiquadFilter();
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.type = 'sine';
+            // 八度音階交錯，豐富層次
+            const freq = baseFreq * (this.openingStep % 2 === 0 ? 2 : 1);
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+
+            gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.28);
+
+            this.openingStep++;
+          } catch (e) {
+            console.warn("開場音樂播放異常", e);
+          }
+        }, 150); // 優雅和緩的節奏
+      }
+
+      stopOpeningBgm() {
+        if (this.openingBgmInterval) {
+          clearInterval(this.openingBgmInterval);
+          this.openingBgmInterval = null;
+        }
+      }
+
+      // 啟動遊戲進行中音樂 (Synthwave 重低音)
+      startGameBgm() {
+        this.init();
+        if (!this.bgmEnabled || this.gameBgmInterval) return;
+        this.stopOpeningBgm();
+
+        this.gameBgmStep = 0;
+        this.gameBgmInterval = setInterval(() => {
+          if (!isGameRunning || isPaused) return;
+          try {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const filter = this.ctx.createBiquadFilter();
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.type = 'sawtooth';
+            const baseFreq = this.gameBgmNotes[this.gameBgmStep % this.gameBgmNotes.length];
+            osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(150, this.ctx.currentTime);
+
+            gain.gain.setValueAtTime(0.07, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.14);
+
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.15);
+
+            this.gameBgmStep++;
+          } catch (e) {
+            console.warn("遊戲進行中音樂播放異常", e);
+          }
+        }, 170); // 貼合心跳與蛇速
+      }
+
+      stopGameBgm() {
+        if (this.gameBgmInterval) {
+          clearInterval(this.gameBgmInterval);
+          this.gameBgmInterval = null;
+        }
+      }
+
+      // 播放遊戲結束主題曲 (悲壯電子安魂曲)
+      playGameOverTheme() {
+        this.init();
+        this.stopGameBgm();
+        this.stopOpeningBgm();
+        if (!this.bgmEnabled) return;
+
+        const now = this.ctx.currentTime;
+        // 悲壯下降小調和弦 (A4 -> F4 -> D4 -> A3)
+        const notes = [440.00, 349.23, 293.66, 220.00];
+        
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.25);
+          
+          gain.gain.setValueAtTime(0.06, now + idx * 0.25);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.25 + 0.6);
+
+          osc.start(now + idx * 0.25);
+          osc.stop(now + idx * 0.25 + 0.65);
+        });
+      }
+
+      toggleBgm() {
+        this.bgmEnabled = !this.bgmEnabled;
+        if (this.bgmEnabled) {
+          if (isGameRunning && !isPaused) {
+            this.startGameBgm();
+          } else if (!isGameRunning) {
+            this.startOpeningBgm();
+          }
+        } else {
+          this.stopOpeningBgm();
+          this.stopGameBgm();
+        }
+        return this.bgmEnabled;
+      }
+
+      // 升級版進食琶音和弦 SFX
+      playEat() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const arpeggio = [523.25, 659.25, 783.99, 1046.50]; // C5 -> E5 -> G5 -> C6 發光能量音階
+
+        arpeggio.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+          
+          gain.gain.setValueAtTime(0.08, now + idx * 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.12);
+
+          osc.start(now + idx * 0.04);
+          osc.stop(now + idx * 0.04 + 0.15);
+        });
+      }
+
+      // 電子感十足的轉彎即時滑音
+      playTurn() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(500, this.ctx.currentTime + 0.06);
+        
+        gain.gain.setValueAtTime(0.035, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.06);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.07);
+      }
+
+      // 立體感毀滅撞擊
+      playCrash() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // 1. 深沉重低音爆散 (Bass Drop)
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.linearRampToValueAtTime(30, now + 0.85);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+        osc.start();
+        osc.stop(now + 0.88);
+        
+        // 2. 高頻撕裂爆破聲 (Noise Peak)
+        const noiseOsc = this.ctx.createOscillator();
+        const noiseGain = this.ctx.createGain();
+        noiseOsc.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+        noiseOsc.type = 'square';
+        noiseOsc.frequency.setValueAtTime(800, now);
+        noiseOsc.frequency.setValueAtTime(100, now + 0.15);
+        noiseGain.gain.setValueAtTime(0.12, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        noiseOsc.start();
+        noiseOsc.stop(now + 0.28);
+      }
+
+      playSelect() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1160, this.ctx.currentTime + 0.1);
+        
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+      }
+    }
+
+    const sfx = new SoundSystem();
+
+    // ==========================================
+    // 2. 遊戲參數與效能監測自適應設定
+    // ==========================================
+    const GRID_SIZE = 100; // 場地維持 100x100
+    const GRID_STEP = 2;   
+    const BOUNDARY = GRID_SIZE / 2; // 50
+    const INITIAL_SPEED = 180; 
+    const SPEED_DECREMENT = 4; 
+    const MIN_SPEED = 70; 
+
+    // 檢測是否為手機或平板裝置 (自動調降負載)
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
+
+    let gameInterval = null;
+    let gameSpeed = INITIAL_SPEED;
+    let isGameRunning = false;
+    let isPaused = false;
+    let score = 0;
+    let bestScore = parseInt(localStorage.getItem('cyber_snake_best') || '0');
+    let crystalsEaten = 0;
+    let maxMultiplier = 1;
+    let currentMultiplier = 1;
+    let comboTimeLeft = 0; 
+    let comboTimer = null;
+
+    // 蛇的邏輯定位陣列
+    let snakeLogical = []; 
+    
+    // 相對轉向方向系統 (上 -> 右 -> 下 -> 左，依順時針排列)
+    const DIRS = [
+      { x: 0, z: -GRID_STEP },  // Index 0: 向上 (North)
+      { x: GRID_STEP, z: 0 },   // Index 1: 向右 (East)
+      { x: 0, z: GRID_STEP },   // Index 2: 向下 (South)
+      { x: -GRID_STEP, z: 0 }   // Index 3: 向左 (West)
+    ];
+
+    let direction = { x: 0, z: -GRID_STEP }; // 預設朝上
+    let inputDirectionQueue = []; // 方向指令輸入緩衝佇列
+
+    // 3D 關聯物件
+    let scene, camera, renderer, composer, bloomPass;
+    let snakeBodyMeshes = [];
+    let foodMesh, foodLight;
+    let starFieldParticles;
+    let particlesArray = []; 
+    
+    // 相機模式: 'chase' (動態追蹤), 'isometric' (經典等角)
+    let cameraMode = 'chase'; 
+    let currentCameraOffset = new THREE.Vector3(0, 22, 28); 
+    let targetCameraOffset = new THREE.Vector3(0, 22, 28);
+
+    // ==========================================
+    // 3. 初始化 Three.js 霓虹世界
+    // ==========================================
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      // 場景
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x020206);
+      scene.fog = new THREE.FogExp2(0x020206, isMobileDevice ? 0.012 : 0.008); // 手機端略微拉高霧氣遮擋遠處，減少 Overdraw
+
+      // 相機
+      camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 1000);
+      
+      // 渲染器 (行動端自動調降 PixelRatio 以保證 60 FPS 流暢度)
+      renderer = new THREE.WebGLRenderer({ antialias: !isMobileDevice, alpha: false, powerPreference: "high-performance" });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(isMobileDevice ? 1.0 : Math.min(window.devicePixelRatio, 2.0));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      container.appendChild(renderer.domElement);
+
+      // 基本照明 (神祕微弱紫光，強化霓虹對比)
+      const ambientLight = new THREE.AmbientLight(0x28154f, 1.4);
+      scene.add(ambientLight);
+
+      // 追隨蛇頭的動態主點光源 (手機端減弱光照半徑防止過載)
+      const headPointLight = new THREE.PointLight(0x00ffcc, 4.5, isMobileDevice ? 20 : 30);
+      headPointLight.name = "headLight";
+      scene.add(headPointLight);
+
+      // 地板發光網格
+      const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE / GRID_STEP, 0x00ffcc, 0x221155);
+      gridHelper.position.y = -0.5;
+      gridHelper.material.opacity = 0.45;
+      gridHelper.material.transparent = true;
+      scene.add(gridHelper);
+
+      // 反光科技板地板
+      const floorGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
+      const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x03030b,
+        roughness: 0.2,
+        metalness: 0.8,
+      });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -0.51;
+      scene.add(floor);
+
+      // 競技場防護邊框
+      const borderGroup = new THREE.Group();
+      const wallMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff0066,
+        emissive: 0xff0066,
+        emissiveIntensity: 2.5,
+        transparent: true,
+        opacity: 0.8
+      });
+
+      const barGeo = new THREE.CylinderGeometry(0.18, 0.18, GRID_SIZE, 8);
+      
+      const barN = new THREE.Mesh(barGeo, wallMaterial);
+      barN.rotation.z = Math.PI / 2;
+      barN.position.set(0, 0, -BOUNDARY);
+      
+      const barS = new THREE.Mesh(barGeo, wallMaterial);
+      barS.rotation.z = Math.PI / 2;
+      barS.position.set(0, 0, BOUNDARY);
+
+      const barE = new THREE.Mesh(barGeo, wallMaterial);
+      barE.rotation.x = Math.PI / 2;
+      barE.position.set(BOUNDARY, 0, 0);
+
+      const barW = new THREE.Mesh(barGeo, wallMaterial);
+      barW.rotation.x = Math.PI / 2;
+      barW.position.set(-BOUNDARY, 0, 0);
+
+      borderGroup.add(barN, barS, barE, barW);
+      scene.add(borderGroup);
+
+      // 邊角立柱
+      const pillarGeo = new THREE.BoxGeometry(1.2, 6, 1.2);
+      const pillarMat = new THREE.MeshStandardMaterial({
+        color: 0x00ffcc,
+        emissive: 0x00ffcc,
+        emissiveIntensity: 1.5,
+        roughness: 0.1
+      });
+      const corners = [
+        [-BOUNDARY, -BOUNDARY],
+        [BOUNDARY, -BOUNDARY],
+        [BOUNDARY, BOUNDARY],
+        [-BOUNDARY, BOUNDARY]
+      ];
+      corners.forEach(([cx, cz]) => {
+        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar.position.set(cx, 2.5, cz);
+        scene.add(pillar);
+      });
+
+      // 裝飾太空微粒 (手機端由 800 顆縮編為 350 顆以大幅節省頂點著色算力)
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = isMobileDevice ? 350 : 800;
+      const starPositions = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount * 3; i += 3) {
+        starPositions[i] = (Math.random() - 0.5) * 250; // X
+        starPositions[i + 1] = Math.random() * 60;     // Y
+        starPositions[i + 2] = (Math.random() - 0.5) * 250; // Z
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      const starMat = new THREE.PointsMaterial({
+        color: 0xaa66ff,
+        size: isMobileDevice ? 0.4 : 0.3,
+        transparent: true,
+        opacity: 0.65,
+        sizeAttenuation: true
+      });
+      starFieldParticles = new THREE.Points(starGeo, starMat);
+      scene.add(starFieldParticles);
+
+      // 食物水晶
+      const crystalGeo = new THREE.OctahedronGeometry(0.75, 0);
+      const crystalMat = new THREE.MeshStandardMaterial({
+        color: 0xff0066,
+        emissive: 0xff007f,
+        emissiveIntensity: 3.8,
+        roughness: 0.05,
+        metalness: 0.95
+      });
+      foodMesh = new THREE.Mesh(crystalGeo, crystalMat);
+      scene.add(foodMesh);
+
+      foodLight = new THREE.PointLight(0xff007f, 4.5, 20);
+      scene.add(foodLight);
+
+      // 發光後處理設定
+      const renderPass = new RenderPass(scene, camera);
+      
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(width, height),
+        isMobileDevice ? 1.0 : 1.5,  // 手機端微調發光強度
+        0.4,  
+        0.18  // 微調閾值
+      );
+
+      composer = new EffectComposer(renderer);
+      composer.addPass(renderPass);
+      composer.addPass(bloomPass);
+
+      const outputPass = new OutputPass();
+      composer.addPass(outputPass);
+
+      // 監聽視窗調整
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('canvas-container');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+      composer.setSize(width, height);
+    }
+
+    // ==========================================
+    // 4. 粒子爆破特效
+    // ==========================================
+    function createExplosion(pos) {
+      // 行動裝置爆散粒子數量減半 (28 -> 14)，保持絕佳物理震盪回饋且不卡頓
+      const particleCount = isMobileDevice ? 14 : 28;
+      const geo = new THREE.SphereGeometry(0.12, 4, 4);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xff007f,
+        transparent: true,
+        opacity: 1.0
+      });
+
+      const instancedGroup = new THREE.Group();
+
+      for (let i = 0; i < particleCount; i++) {
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speedY = (Math.random() - 0.15) * 4.5;
+        const speedRadius = Math.random() * 4.5 + 2.5;
+        
+        mesh.userData = {
+          velocity: new THREE.Vector3(
+            Math.cos(angle) * speedRadius,
+            speedY,
+            Math.sin(angle) * speedRadius
+          ),
+          life: 1.0,
+          decay: Math.random() * 0.03 + 0.03
+        };
+
+        instancedGroup.add(mesh);
+        particlesArray.push(mesh);
+      }
+      scene.add(instancedGroup);
+
+      setTimeout(() => {
+        scene.remove(instancedGroup);
+        geo.dispose();
+        mat.dispose();
+      }, 1200);
+    }
+
+    function updateExplosionParticles(delta) {
+      for (let i = particlesArray.length - 1; i >= 0; i--) {
+        const p = particlesArray[i];
+        p.position.x += p.userData.velocity.x * delta;
+        p.position.y += p.userData.velocity.y * delta;
+        p.position.z += p.userData.velocity.z * delta;
+
+        p.userData.velocity.y -= 9.8 * delta * 0.45;
+        
+        p.userData.life -= p.userData.decay;
+        p.material.opacity = p.userData.life;
+
+        if (p.userData.life <= 0) {
+          particlesArray.splice(i, 1);
+        }
+      }
+    }
+
+    // ==========================================
+    // 5. 遊戲邏輯控制與重置
+    // ==========================================
+    function resetGame() {
+      score = 0;
+      crystalsEaten = 0;
+      currentMultiplier = 1;
+      maxMultiplier = 1;
+      comboTimeLeft = 0;
+      gameSpeed = INITIAL_SPEED;
+      direction = { x: 0, z: -GRID_STEP }; 
+      inputDirectionQueue = []; 
+
+      document.getElementById('score').innerText = '0000';
+      document.getElementById('multiplier').innerText = 'x1';
+      document.getElementById('combo-bar').style.width = '0%';
+
+      // 清除舊的蛇身
+      snakeBodyMeshes.forEach(mesh => scene.remove(mesh));
+      snakeBodyMeshes = [];
+
+      snakeLogical = [
+        { x: 0, z: 0 },
+        { x: 0, z: GRID_STEP },
+        { x: 0, z: GRID_STEP * 2 },
+        { x: 0, z: GRID_STEP * 3 }
+      ];
+
+      snakeLogical.forEach((pos, idx) => {
+        const mesh = createSnakeSegment(idx);
+        mesh.position.set(pos.x, 0, pos.z);
+        scene.add(mesh);
+        snakeBodyMeshes.push(mesh);
+      });
+
+      spawnFood();
+    }
+
+    function createSnakeSegment(index) {
+      const isHead = index === 0;
+      let geo, mat;
+
+      if (isHead) {
+        geo = new THREE.SphereGeometry(0.85, isMobileDevice ? 16 : 32, isMobileDevice ? 16 : 32); // 行動端優化細分面
+        mat = new THREE.MeshStandardMaterial({
+          color: 0x00ffcc,
+          emissive: 0x00ffcc,
+          emissiveIntensity: 2.2,
+          roughness: 0.1,
+          metalness: 0.9
+        });
+      } else {
+        const scale = Math.max(0.4, 0.8 * Math.pow(0.96, index));
+        geo = new THREE.SphereGeometry(scale, isMobileDevice ? 8 : 16, isMobileDevice ? 8 : 16);
+        
+        const segmentColor = new THREE.Color();
+        const ratio = Math.min(index / 20, 1.0);
+        segmentColor.lerpColors(new THREE.Color(0x00ffcc), new THREE.Color(0x9900ff), ratio);
+
+        mat = new THREE.MeshStandardMaterial({
+          color: segmentColor,
+          emissive: segmentColor,
+          emissiveIntensity: 1.5 * (1.0 - ratio * 0.5),
+          roughness: 0.15,
+          metalness: 0.8
+        });
+      }
+
+      const mesh = new THREE.Mesh(geo, mat);
+
+      if (isHead) {
+        const eyeGeo = new THREE.SphereGeometry(0.18, 8, 8);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0066 });
+        
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(0.38, 0.35, -0.5);
+        
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(-0.38, 0.35, -0.5);
+
+        mesh.add(leftEye, rightEye);
+      }
+
+      return mesh;
+    }
+
+    function spawnFood() {
+      let valid = false;
+      let rx, rz;
+
+      while (!valid) {
+        const maxRangeFactor = Math.floor((BOUNDARY - 4) / GRID_STEP); 
+        const factorX = Math.floor(Math.random() * (maxRangeFactor * 2 + 1)) - maxRangeFactor;
+        const factorZ = Math.floor(Math.random() * (maxRangeFactor * 2 + 1)) - maxRangeFactor;
+
+        rx = factorX * GRID_STEP;
+        rz = factorZ * GRID_STEP;
+
+        valid = !snakeLogical.some(segment => segment.x === rx && segment.z === rz);
+      }
+
+      foodMesh.position.set(rx, 0, rz);
+      foodLight.position.set(rx, 2, rz);
+
+      gsap.fromTo(foodMesh.scale, 
+        { x: 0, y: 0, z: 0 }, 
+        { x: 1, y: 1, z: 1, duration: 0.6, ease: "back.out(2)" }
+      );
+    }
+
+    function startComboTimer() {
+      if (comboTimer) clearInterval(comboTimer);
+      comboTimeLeft = 100;
+
+      comboTimer = setInterval(() => {
+        if (!isGameRunning || isPaused) return;
+        
+        comboTimeLeft -= 1.5; 
+        if (comboTimeLeft <= 0) {
+          comboTimeLeft = 0;
+          currentMultiplier = 1;
+          document.getElementById('multiplier').innerText = 'x1';
+          document.getElementById('multiplier').classList.remove('neon-text-pink');
+          document.getElementById('combo-bar').style.width = '0%';
+          clearInterval(comboTimer);
+        } else {
+          document.getElementById('combo-bar').style.width = `${comboTimeLeft}%`;
+        }
+      }, 50);
+    }
+
+    // ==========================================
+    // 6. 主邏輯更新迴圈 (Tick)
+    // ==========================================
+    function gameTick() {
+      if (!isGameRunning || isPaused) return;
+
+      if (inputDirectionQueue.length > 0) {
+        direction = inputDirectionQueue.shift();
+      }
+
+      const oldHead = snakeLogical[0];
+      const newHead = {
+        x: oldHead.x + direction.x,
+        z: oldHead.z + direction.z
+      };
+
+      if (Math.abs(newHead.x) > BOUNDARY || Math.abs(newHead.z) > BOUNDARY) {
+        gameOver();
+        return;
+      }
+
+      for (let i = 0; i < snakeLogical.length - 1; i++) {
+        if (snakeLogical[i].x === newHead.x && snakeLogical[i].z === newHead.z) {
+          gameOver();
+          return;
+        }
+      }
+
+      snakeLogical.unshift(newHead);
+
+      if (newHead.x === foodMesh.position.x && newHead.z === foodMesh.position.z) {
+        sfx.playEat();
+        crystalsEaten++;
+
+        startComboTimer();
+        score += 10 * currentMultiplier;
+        document.getElementById('score').innerText = String(score).padStart(4, '0');
+
+        if (currentMultiplier < 5) {
+          currentMultiplier++;
+          document.getElementById('multiplier').innerText = `x${currentMultiplier}`;
+          document.getElementById('multiplier').classList.add('neon-text-pink');
+          if (currentMultiplier > maxMultiplier) {
+            maxMultiplier = currentMultiplier;
+          }
+        }
+
+        createExplosion(foodMesh.position);
+
+        gsap.fromTo(bloomPass, 
+          { strength: isMobileDevice ? 2.5 : 3.5 }, 
+          { strength: isMobileDevice ? 1.0 : 1.5, duration: 0.8, ease: "power2.out" }
+        );
+
+        gsap.to(camera, {
+          fov: 62,
+          duration: 0.1,
+          yoyo: true,
+          repeat: 1,
+          onUpdate: () => camera.updateProjectionMatrix()
+        });
+
+        const newSegIndex = snakeBodyMeshes.length;
+        const newSegMesh = createSnakeSegment(newSegIndex);
+        const lastSegPos = snakeBodyMeshes[snakeBodyMeshes.length - 1].position;
+        newSegMesh.position.copy(lastSegPos);
+        scene.add(newSegMesh);
+        snakeBodyMeshes.push(newSegMesh);
+
+        spawnFood();
+
+        gameSpeed = Math.max(MIN_SPEED, INITIAL_SPEED - (crystalsEaten * SPEED_DECREMENT));
+        clearInterval(gameInterval);
+        gameInterval = setInterval(gameTick, gameSpeed);
+
+      } else {
+        snakeLogical.pop();
+      }
+    }
+
+    // ==========================================
+    // 7. 動態運鏡與渲染迴圈 (RAF)
+    // ==========================================
+    let lastTime = 0;
+
+    function animate(time) {
+      requestAnimationFrame(animate);
+
+      const delta = (time - lastTime) / 1000;
+      lastTime = time;
+
+      // 1. 更新食物
+      if (foodMesh) {
+        foodMesh.rotation.x += 1.2 * delta;
+        foodMesh.rotation.y += 0.8 * delta;
+        foodMesh.position.y = Math.sin(time * 0.004) * 0.35 + 0.35;
+        foodLight.position.y = foodMesh.position.y + 1.2;
+      }
+
+      // 2. 更新微粒漂移
+      if (starFieldParticles) {
+        const positions = starFieldParticles.geometry.attributes.position.array;
+        for (let i = 1; i < positions.length; i += 3) {
+          positions[i] -= 2.0 * delta; 
+          if (positions[i] < -5) {
+            positions[i] = 55; 
+          }
+        }
+        starFieldParticles.geometry.attributes.position.needsUpdate = true;
+        starFieldParticles.rotation.y += 0.012 * delta;
+      }
+
+      // 3. 更新爆破粒子
+      updateExplosionParticles(delta);
+
+      // 4. LERP 平滑跟隨
+      if (snakeBodyMeshes.length > 0 && snakeLogical.length > 0) {
+        for (let i = 0; i < snakeBodyMeshes.length; i++) {
+          const mesh = snakeBodyMeshes[i];
+          const targetPos = snakeLogical[i];
+
+          if (targetPos) {
+            const lerpFactor = i === 0 ? 0.34 : 0.24; 
+            mesh.position.lerp(new THREE.Vector3(targetPos.x, 0, targetPos.z), lerpFactor);
+          }
+        }
+
+        // 蛇頭旋轉
+        const headMesh = snakeBodyMeshes[0];
+        const targetRotY = Math.atan2(direction.x, direction.z);
+        let diff = targetRotY - headMesh.rotation.y;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        headMesh.rotation.y += diff * 0.32;
+
+        const headLight = scene.getObjectByName("headLight");
+        if (headLight) {
+          headLight.position.copy(headMesh.position);
+          headLight.position.y = 1.8;
+        }
+
+        // ==========================================
+        // 5. 賽博朋克運鏡 (配合大地圖，重新定位偏移量)
+        // ==========================================
+        if (cameraMode === 'chase') {
+          const offsetDist = 26; 
+          const height = 18;
+
+          if (direction.x > 0) {
+            targetCameraOffset.set(-offsetDist, height, 0);
+          } else if (direction.x < 0) {
+            targetCameraOffset.set(offsetDist, height, 0);
+          } else if (direction.z > 0) {
+            targetCameraOffset.set(0, height, -offsetDist);
+          } else if (direction.z < 0) {
+            targetCameraOffset.set(0, height, offsetDist);
+          }
+
+          currentCameraOffset.lerp(targetCameraOffset, 0.04);
+          
+          const destCamPos = headMesh.position.clone().add(currentCameraOffset);
+          camera.position.lerp(destCamPos, 0.08);
+
+          const lookTarget = headMesh.position.clone().add(new THREE.Vector3(direction.x, 0, direction.z).multiplyScalar(2.0));
+          const currentLookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+          currentLookAt.lerp(lookTarget, 0.1);
+          camera.lookAt(currentLookAt);
+
+        } else {
+          // 經典等角視角
+          const targetIsomPos = new THREE.Vector3(0, 68, 70);
+          camera.position.lerp(targetIsomPos, 0.05);
+          
+          const centerTarget = new THREE.Vector3(0, -6, -6);
+          const currentLookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+          currentLookAt.lerp(centerTarget, 0.05);
+          camera.lookAt(currentLookAt);
+        }
+      }
+
+      if (composer) {
+        composer.render();
+      }
+    }
+
+    // ==========================================
+    // 8. 狀態控制
+    // ==========================================
+    function startGame() {
+      sfx.init();
+      sfx.playSelect();
+      sfx.startGameBgm(); 
+
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('hud').style.opacity = '1';
+      document.getElementById('hud').classList.remove('pointer-events-none');
+      document.getElementById('touch-controls').classList.remove('hidden');
+
+      resetGame();
+
+      isGameRunning = true;
+      isPaused = false;
+
+      if (gameInterval) clearInterval(gameInterval);
+      gameInterval = setInterval(gameTick, gameSpeed);
+    }
+
+    function togglePause() {
+      if (!isGameRunning) return;
+      sfx.init();
+      sfx.playSelect();
+
+      isPaused = !isPaused;
+      const pauseScreen = document.getElementById('pause-screen');
+      const pauseIcon = document.getElementById('pause-icon');
+
+      if (isPaused) {
+        pauseScreen.classList.remove('hidden');
+        pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />`;
+        sfx.stopGameBgm(); 
+      } else {
+        pauseScreen.classList.add('hidden');
+        pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />`;
+        sfx.startGameBgm(); 
+      }
+    }
+
+    function gameOver() {
+      isGameRunning = false;
+      clearInterval(gameInterval);
+      if (comboTimer) clearInterval(comboTimer);
+      
+      sfx.playCrash();
+      sfx.playGameOverTheme(); 
+
+      if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('cyber_snake_best', bestScore);
+      }
+
+      gsap.to(camera.position, {
+        x: camera.position.x + (Math.random() - 0.5) * 8,
+        y: camera.position.y + 5,
+        z: camera.position.z + 10,
+        duration: 0.08,
+        repeat: 6,
+        yoyo: true,
+        onComplete: () => {
+          document.getElementById('go-score').innerText = String(score).padStart(4, '0');
+          document.getElementById('go-best').innerText = String(bestScore).padStart(4, '0');
+          document.getElementById('go-crystals').innerText = crystalsEaten;
+          document.getElementById('go-max-mult').innerText = `x${maxMultiplier}`;
+          document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+      });
+      
+      gsap.to(bloomPass, { strength: 4.8, duration: 0.1, yoyo: true, repeat: 1 });
+    }
+
+    // ==========================================
+    // 9. 關鍵操作修復：相對轉向處理邏輯
+    // ==========================================
+    function turnRelative(turnType) {
+      if (!isGameRunning || isPaused) return;
+
+      const lastDir = inputDirectionQueue.length > 0 ? inputDirectionQueue[inputDirectionQueue.length - 1] : direction;
+
+      let currentIndex = DIRS.findIndex(d => d.x === lastDir.x && d.z === lastDir.z);
+      if (currentIndex === -1) currentIndex = 0;
+
+      let nextIndex;
+      if (turnType === 'LEFT') {
+        nextIndex = (currentIndex - 1 + 4) % 4;
+      } else if (turnType === 'RIGHT') {
+        nextIndex = (currentIndex + 1) % 4;
+      }
+
+      const nextDir = DIRS[nextIndex];
+
+      if (inputDirectionQueue.length < 2) {
+        inputDirectionQueue.push(nextDir);
+        sfx.playTurn(); 
+      }
+    }
+
+    function handleKeyDown(e) {
+      if (!isGameRunning || isPaused) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (isPaused) togglePause();
+        }
+        return;
+      }
+
+      switch (e.code) {
+        case 'ArrowLeft':
+        case 'KeyA':
+          e.preventDefault();
+          turnRelative('LEFT');
+          break;
+        
+        case 'ArrowRight':
+        case 'KeyD':
+          e.preventDefault();
+          turnRelative('RIGHT');
+          break;
+
+        case 'Space':
+          e.preventDefault();
+          togglePause();
+          break;
+        
+        case 'ArrowUp':
+        case 'KeyW':
+        case 'ArrowDown':
+        case 'KeyS':
+          e.preventDefault();
+          break;
+      }
+    }
+
+    // 行動裝置阻斷 iOS 彈性滾動干擾
+    document.body.addEventListener('touchmove', function(e) {
+      if (isGameRunning && !isPaused) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // 實體按鈕與選單載入
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        initThree();
+      } catch (err) {
+        console.error("Three.js 初始化失敗: ", err);
+      }
+      
+      document.getElementById('best-score').innerText = String(bestScore).padStart(4, '0');
+
+      sfx.startOpeningBgm();
+
+      requestAnimationFrame(animate);
+
+      // 開始按鈕
+      document.getElementById('btn-start').addEventListener('click', (e) => {
+        e.target.blur(); 
+        startGame();
+      });
+
+      // 暫停按鈕
+      document.getElementById('btn-pause').addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        togglePause();
+      });
+      document.getElementById('btn-resume').addEventListener('click', (e) => {
+        e.target.blur();
+        togglePause();
+      });
+
+      // 重新啟動
+      document.getElementById('btn-restart').addEventListener('click', (e) => {
+        e.target.blur();
+        sfx.playSelect();
+        sfx.startGameBgm();
+        document.getElementById('gameover-screen').classList.add('hidden');
+        resetGame();
+        isGameRunning = true;
+        isPaused = false;
+        if (gameInterval) clearInterval(gameInterval);
+        gameInterval = setInterval(gameTick, gameSpeed);
+      });
+
+      // BGM 開關
+      const btnBgm = document.getElementById('btn-bgm');
+      btnBgm.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        sfx.playSelect();
+        const enabled = sfx.toggleBgm();
+        if (enabled) {
+          btnBgm.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            <span class="hidden sm:inline">音樂: 開</span>`;
+          btnBgm.classList.remove('opacity-50');
+        } else {
+          btnBgm.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+            <span class="hidden sm:inline">音樂: 關</span>`;
+          btnBgm.classList.add('opacity-50');
+        }
+      });
+
+      // 相機模式
+      const btnCam = document.getElementById('btn-camera-mode');
+      btnCam.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        sfx.playSelect();
+        if (cameraMode === 'chase') {
+          cameraMode = 'isometric';
+          btnCam.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span class="hidden sm:inline">相機: 經典</span>`;
+        } else {
+          cameraMode = 'chase';
+          btnCam.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span class="hidden sm:inline">相機: 追蹤</span>`;
+        }
+      });
+
+      // 監聽鍵盤與觸控
+      window.addEventListener('keydown', handleKeyDown);
+
+      // 行動端雙鈕控制 (人體工學按鈕監聽，徹底解決雙擊縮放與回彈問題)
+      const touchLeft = document.getElementById('ctrl-left');
+      const touchRight = document.getElementById('ctrl-right');
+
+      touchLeft.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        turnRelative('LEFT');
+      }, { passive: false });
+
+      touchRight.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        turnRelative('RIGHT');
+      }, { passive: false });
+    });
+  </script>
+</body>
+</html>
