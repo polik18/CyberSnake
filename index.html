@@ -3,7 +3,49 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Cyber Snake 3D - 霓虹超視覺 3D 貪食蛇</title>
+  
+  <!-- ==========================================
+       SEO 核心關鍵字優化 (Master SEO Optimization)
+       ========================================== -->
+  <title>Cyber Snake 3D - 終極賽博朋克 3D 貪食蛇網頁遊戲 | 免費線上玩</title>
+  <meta name="description" content="最震撼的 3D 霓虹貪食蛇網頁遊戲！結合賽博朋克未來美學、超流暢的 Three.js WebGL 3D 渲染技術、GSAP 電影級動態運鏡，並融入專屬「開場、遊戲中、遊戲結束」三重實時合成主題音樂。免下載安裝，立即在手機或電腦上開啟極致流暢的 60 FPS 挑戰！">
+  <meta name="keywords" content="3D貪食蛇, 3D 貪食蛇, 賽博朋克, 貪食蛇網頁遊戲, 免費線上遊戲, Three.js 遊戲, WebGL 3D 遊戲, Cyberpunk Snake 3D, 街機遊戲">
+  <meta name="author" content="Cyber Snake 3D Team">
+  <link rel="canonical" href="https://cyber-snake-3d.example.com/" />
+
+  <!-- Open Graph 協定 (社群分享優化 FB/Line) -->
+  <meta property="og:title" content="Cyber Snake 3D - 終極賽博朋克 3D 貪食蛇網頁遊戲 | 免費線上玩" />
+  <meta property="og:description" content="場地擴大 4 倍、徹底修正卡鍵，並融入三重實時 Web Audio 街機電音！快來體驗最奢華的 3D 霓虹貪食蛇大對決。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://cyber-snake-3d.example.com/" />
+  <meta property="og:image" content="https://placehold.co/1200x630/030308/00ffcc?text=CYBER+SNAKE+3D" />
+  <meta property="og:site_name" content="Cyber Snake 3D" />
+
+  <!-- Twitter Card 標記 -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Cyber Snake 3D - 終極賽博朋克 3D 貪食蛇網頁遊戲" />
+  <meta name="twitter:description" content="頂級 Three.js 渲染與實時街機合成音效，2026 必玩的科技感 3D 貪食蛇！" />
+  <meta name="twitter:image" content="https://placehold.co/1200x630/030308/00ffcc?text=CYBER+SNAKE+3D" />
+
+  <!-- Google 搜尋富媒體摘要：遊戲應用結構化資料 (Schema JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Cyber Snake 3D",
+    "operatingSystem": "Windows, macOS, Linux, Android, iOS",
+    "applicationCategory": "GameApplication",
+    "genre": "Arcade, Action, Sci-Fi",
+    "browserRequirements": "Requires HTML5, WebGL, Web Audio API support",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "TWD"
+    },
+    "description": "極具視覺震撼力的 3D 霓虹貪食蛇網頁遊戲！採用 Three.js WebGL 3D 渲染、GSAP 動態運鏡與實時 Web Audio 街機電子音樂合成系統。"
+  }
+  </script>
+
   <!-- Tailwind CSS 適用於極速、現代化的 UI 建構 -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 載入未來感與街機風格的 Google Fonts -->
@@ -48,11 +90,11 @@
 </head>
 <body class="text-white overflow-hidden select-none">
 
-  <!-- 3D 畫布容器 -->
-  <div id="canvas-container" class="absolute inset-0 z-0"></div>
+  <!-- 3D 畫布容器 (WebGL Base) -->
+  <main id="canvas-container" class="absolute inset-0 z-0"></main>
 
   <!-- HUD 頂部遊戲狀態欄 -->
-  <div id="hud" class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center pointer-events-none transition-opacity duration-500 opacity-0 gap-2">
+  <header id="hud" class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center pointer-events-none transition-opacity duration-500 opacity-0 gap-2">
     <!-- 左側分數面板 (手機端自動縮小，隱藏輔助文字) -->
     <div class="glassmorphism rounded-xl px-3 py-2 sm:px-5 sm:py-3 flex gap-3 sm:gap-6 items-center pointer-events-auto">
       <div>
@@ -97,25 +139,34 @@
         </svg>
       </button>
     </div>
-  </div>
+  </header>
 
   <!-- 開始選單畫面 -->
-  <div id="start-screen" class="absolute inset-0 z-20 flex flex-col justify-center items-center px-4 bg-gradient-to-b from-transparent to-[#03030a]/95 animate-fade-in">
+  <section id="start-screen" class="absolute inset-0 z-20 flex flex-col justify-center items-center px-4 bg-gradient-to-b from-transparent to-[#03030a]/95 animate-fade-in">
     <div class="glassmorphism rounded-3xl p-6 md:p-12 max-w-lg w-full text-center flex flex-col items-center gap-6 border-cyan-500/30">
       <!-- 標題 -->
-      <div class="relative">
+      <header class="relative">
         <h1 class="text-5xl md:text-6xl font-black tracking-wider uppercase text-white neon-text-cyan">CYBER</h1>
         <h2 class="text-3xl md:text-4xl font-black tracking-widest uppercase text-pink-500 neon-text-pink -mt-1">SNAKE 3D</h2>
         <div class="absolute -top-6 -right-6 text-[10px] text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded tracking-widest uppercase animate-pulse">V2.5 MAX</div>
-      </div>
+      </header>
 
-      <p class="text-gray-400 text-sm font-light leading-relaxed max-w-md">
-        全新終極修復版！場地擴大 4 倍，修正了鍵盤轉彎卡死問題，並融入專屬「開場、遊戲中、遊戲結束」三重實時合成主題音樂。
-      </p>
+      <!-- 遊戲介紹區塊 (SEO 關鍵字整合與排版設計優化) -->
+      <article class="text-left text-xs text-gray-400 space-y-3 max-w-md w-full border-l-2 border-cyan-400 pl-4 py-1 leading-relaxed">
+        <h3 class="font-bold text-gray-200 text-sm uppercase tracking-wider">🎮 遊戲介紹 (Game Information)</h3>
+        <p class="text-gray-300">
+          <strong class="text-cyan-400">Cyber Snake 3D</strong> 迎來全新終極修復版！場地擴大 4 倍（100x100 的宏偉規模），並徹底修正了舊版鍵盤轉彎卡死問題。本系統獨家融入專屬「開場、遊戲中、遊戲結束」三重實時合成主題音樂，為您呈現無與倫比的賽博朋克立體感官饗宴！
+        </p>
+        <ul class="list-disc list-inside space-y-1 text-gray-400 text-[11px]">
+          <li><span class="text-pink-400">超大對戰地圖</span>：提供更寬廣的探索空間與高難度蛇尾擺盪。</li>
+          <li><span class="text-pink-400">實時 Web Audio 街機電音</span>：不需載入外部音樂，純數位即時頻率合成。</li>
+          <li><span class="text-pink-400">0 延遲操作緩衝</span>：支持多重轉向指令排程，再高頻的微操也完美支持。</li>
+        </ul>
+      </article>
 
       <!-- 說明 -->
       <div class="w-full bg-black/40 rounded-xl p-4 text-left border border-white/5 flex flex-col gap-2">
-        <div class="text-xs text-cyan-400 tracking-wider font-bold">● 極簡相對控制設計</div>
+        <div class="text-xs text-cyan-400 tracking-wider font-bold">● 極簡相對控制設計 (Control Scheme)</div>
         <div class="grid grid-cols-2 gap-2 text-xs text-gray-300">
           <div class="flex items-center gap-2"><span class="bg-cyan-500/20 px-2 py-0.5 rounded text-cyan-300 font-bold border border-cyan-500/30 font-sans">A</span> / <span class="bg-cyan-500/20 px-2 py-0.5 rounded text-cyan-300 font-bold border border-cyan-500/30 font-sans">←</span> 向左轉 90°</div>
           <div class="flex items-center gap-2"><span class="bg-pink-500/20 px-2 py-0.5 rounded text-pink-300 font-bold border border-pink-500/30 font-sans">D</span> / <span class="bg-pink-500/20 px-2 py-0.5 rounded text-pink-300 font-bold border border-pink-500/30 font-sans">→</span> 向右轉 90°</div>
@@ -128,7 +179,7 @@
         啟動模擬系統
       </button>
     </div>
-  </div>
+  </section>
 
   <!-- 暫停畫面 -->
   <div id="pause-screen" class="absolute inset-0 z-20 flex justify-center items-center px-4 bg-black/60 backdrop-blur-md hidden">
@@ -178,7 +229,7 @@
     </div>
   </div>
 
-  <!-- 行動裝置左右相對轉向控制 (Ergonomic Console Layout - 完美掌機化布局) -->
+  <!-- 行動裝置左右相對轉向控制 (Ergonomic Console Layout) -->
   <div id="touch-controls" class="fixed bottom-8 left-0 right-0 z-30 flex justify-between px-6 pointer-events-none lg:hidden hidden">
     <!-- 左轉按鈕 (CCW 逆時針) - 位於左拇指自然落點，發散藍光 -->
     <button id="ctrl-left" style="touch-action: none;" class="w-20 h-20 rounded-full glassmorphism pointer-events-auto flex flex-col items-center justify-center active:scale-90 active:bg-cyan-500/20 transition-all border-cyan-500/40 text-cyan-400 neon-border-cyan">
@@ -195,11 +246,6 @@
       </svg>
       <span class="text-[9px] font-bold mt-1 tracking-widest">右轉 ↻</span>
     </button>
-  </div>
-
-  <!-- 免責聲明 Footer -->
-  <div id="disclaimer-footer" class="absolute bottom-1 w-full text-center text-[8px] text-gray-600 font-sans tracking-wide z-10 pointer-events-none hidden sm:block">
-    免責聲明：本網頁與遊戲程式僅供個人娛樂、視覺效果與 3D 技術學術展示，不代表任何商業用途或營運保證。所有遊玩分數及數據僅儲存於本地瀏覽器暫存中。
   </div>
 
   <!-- 導入 GSAP 作為強大的平滑過渡補間動畫庫 -->
@@ -489,7 +535,7 @@
     const SPEED_DECREMENT = 4; 
     const MIN_SPEED = 70; 
 
-    // 檢測是否為手機或平板裝置 (自動調降負載)
+    // 檢測是否為手機或平板裝置 (自動調降負載以確保 60 FPS)
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
 
     let gameInterval = null;
@@ -1036,7 +1082,7 @@
         }
 
         // ==========================================
-        // 5. 賽博朋克運鏡 (配合大地圖，重新定位偏移量)
+        // 5. 賽博朋克運鏡 (配合場地放大，重新定位偏移量)
         // ==========================================
         if (cameraMode === 'chase') {
           const offsetDist = 26; 
@@ -1063,7 +1109,7 @@
           camera.lookAt(currentLookAt);
 
         } else {
-          // 經典等角視角
+          // 經典等角視角 - 配合 100x100 大場地等比例拉高相機
           const targetIsomPos = new THREE.Vector3(0, 68, 70);
           camera.position.lerp(targetIsomPos, 0.05);
           
@@ -1085,7 +1131,7 @@
     function startGame() {
       sfx.init();
       sfx.playSelect();
-      sfx.startGameBgm(); 
+      sfx.startGameBgm(); // 停止開場音樂，啟動重低音遊戲 BGM
 
       document.getElementById('start-screen').classList.add('hidden');
       document.getElementById('hud').style.opacity = '1';
@@ -1113,11 +1159,11 @@
       if (isPaused) {
         pauseScreen.classList.remove('hidden');
         pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />`;
-        sfx.stopGameBgm(); 
+        sfx.stopGameBgm(); // 暫停時停止重低音
       } else {
         pauseScreen.classList.add('hidden');
         pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />`;
-        sfx.startGameBgm(); 
+        sfx.startGameBgm(); // 恢復時繼續
       }
     }
 
@@ -1127,7 +1173,7 @@
       if (comboTimer) clearInterval(comboTimer);
       
       sfx.playCrash();
-      sfx.playGameOverTheme(); 
+      sfx.playGameOverTheme(); // 觸放遊戲結束電子安魂曲
 
       if (score > bestScore) {
         bestScore = score;
@@ -1159,23 +1205,26 @@
     function turnRelative(turnType) {
       if (!isGameRunning || isPaused) return;
 
+      // 取得佇列中最後一個指令；若佇列為空，則以當前方向為基礎
       const lastDir = inputDirectionQueue.length > 0 ? inputDirectionQueue[inputDirectionQueue.length - 1] : direction;
 
+      // 在 DIRS 陣列中尋找最後方向的 index
       let currentIndex = DIRS.findIndex(d => d.x === lastDir.x && d.z === lastDir.z);
       if (currentIndex === -1) currentIndex = 0;
 
       let nextIndex;
       if (turnType === 'LEFT') {
-        nextIndex = (currentIndex - 1 + 4) % 4;
+        nextIndex = (currentIndex - 1 + 4) % 4; // 逆時針 90°
       } else if (turnType === 'RIGHT') {
-        nextIndex = (currentIndex + 1) % 4;
+        nextIndex = (currentIndex + 1) % 4;  // 順時針 90°
       }
 
       const nextDir = DIRS[nextIndex];
 
+      // 限制佇列排程長度最大為 2 (防止多餘按鍵擠爆，並確保靈敏連續過彎)
       if (inputDirectionQueue.length < 2) {
         inputDirectionQueue.push(nextDir);
-        sfx.playTurn(); 
+        sfx.playTurn(); // 按下瞬間 0 延遲播放轉彎音效
       }
     }
 
@@ -1206,6 +1255,7 @@
           togglePause();
           break;
         
+        // 阻斷上下鍵，防止與玩家直覺衝突
         case 'ArrowUp':
         case 'KeyW':
         case 'ArrowDown':
@@ -1232,13 +1282,14 @@
       
       document.getElementById('best-score').innerText = String(bestScore).padStart(4, '0');
 
+      // 載入完成，直接啟動明亮溫和的開場主題旋律！
       sfx.startOpeningBgm();
 
       requestAnimationFrame(animate);
 
       // 開始按鈕
       document.getElementById('btn-start').addEventListener('click', (e) => {
-        e.target.blur(); 
+        e.target.blur(); // 釋放焦點防止鍵盤控制失效
         startGame();
       });
 
