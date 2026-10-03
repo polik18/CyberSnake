@@ -134,6 +134,13 @@
         </svg>
         <span class="hidden sm:inline">音樂: 開</span>
       </button>
+      <button id="btn-visual-mode" class="glassmorphism hover:bg-cyan-500/10 active:scale-95 transition px-2.5 py-2 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m6.364.386l-1.591 1.591M18 12h-2.25M5.636 13.591l-1.591-1.591M12 18.75l.02.25m-9.518-6.59l2.09-.52M12 21.75H9.75M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
+        </svg>
+        <span class="hidden sm:inline">舒適模式: 開</span>
+        <span class="sm:hidden">舒適</span>
+      </button>
       <button id="btn-pause" class="glassmorphism hover:bg-cyan-500/10 active:scale-95 transition p-2.5 rounded-xl text-cyan-400 border border-cyan-500/30">
         <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -259,6 +266,166 @@
     import { RenderPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/UnrealBloomPass.js';
     import { OutputPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/OutputPass.js';
+
+    // 行動裝置偵測（P0 視覺模式需在此時決定）。
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
+
+    // ==========================================
+    // 0. 視覺舒適度設定 (Phase 0: P0-02 集中設定)
+    // ==========================================
+    // comfort 模式：降低曝光、bloom、emissive、點光源強度，移除強閃與震盪。
+    // neon 模式：保留原來的霓虹高亮度視覺風格。
+    // 兩種模式共用相同的場景結構，僅調整亮度參數與特效強度。
+    const VISUAL_PROFILES = {
+      comfort: {
+        // 場景基礎亮度
+        sceneBg: 0x030308,
+        fogDensity: 0.009,
+        toneMappingExposure: 0.80,
+        ambientIntensity: 0.75,
+        // 追隨蛇頭的點光源
+        headPointLightIntensity: 1.2,
+        headPointLightRange: isMobileDevice ? 14 : 18,
+        // 發光網格
+        gridColor: 0x00a088,
+        gridLineColor: 0x1a3355,
+        gridOpacity: 0.38,
+        // 邊框與立柱
+        borderEmissive: 0xff0066,
+        borderEmissiveIntensity: 0.8,
+        pillarEmissive: 0x00d0b0,
+        pillarEmissiveIntensity: 0.9,
+        // 蛇頭
+        headColor: 0x00ddbb,
+        headEmissive: 0x00ddbb,
+        headEmissiveIntensity: 0.75,
+        headRadius: 0.85,
+        // 蛇身漸層起點色
+        bodyColorStart: 0x00ddbb,
+        // 食物水晶
+        foodEmissive: 0xff007f,
+        foodEmissiveIntensity: 1.2,
+        foodLightIntensity: 1.5,
+        // 後處理 bloom
+        bloomStrength: 0.60,
+        bloomThreshold: 0.65,
+        // 進食 FOV pulse 幅度
+        eatFovPulse: 58,
+        // 強閃與震盪幅度 (comfort 大幅降低)
+        eatBloomPulse: 1.15,
+        gameOverBloomPulse: 1.2,
+        cameraShakeRange: 1.0,
+        cameraShakeDuration: 0.06,
+        // 蛇頭方向標記
+        directionMarkerColor: 0xff3366,
+      },
+      neon: {
+        sceneBg: 0x020206,
+        fogDensity: 0.008,
+        toneMappingExposure: 1.0,
+        ambientIntensity: 1.4,
+        headPointLightIntensity: 4.5,
+        headPointLightRange: isMobileDevice ? 20 : 30,
+        gridColor: 0x00ffcc,
+        gridLineColor: 0x221155,
+        gridOpacity: 0.45,
+        borderEmissive: 0xff0066,
+        borderEmissiveIntensity: 2.5,
+        pillarEmissive: 0x00ffcc,
+        pillarEmissiveIntensity: 1.5,
+        headColor: 0x00ffcc,
+        headEmissive: 0x00ffcc,
+        headEmissiveIntensity: 2.2,
+        headRadius: 0.85,
+        bodyColorStart: 0x00ffcc,
+        foodEmissive: 0xff007f,
+        foodEmissiveIntensity: 3.8,
+        foodLightIntensity: 4.5,
+        bloomStrength: 1.5,
+        bloomThreshold: 0.18,
+        eatFovPulse: 62,
+        eatBloomPulse: 3.5,
+        gameOverBloomPulse: 4.8,
+        cameraShakeRange: 8,
+        cameraShakeDuration: 0.08,
+        directionMarkerColor: 0xff0066,
+      },
+    };
+
+    // 目前選用的視覺模式，預設 comfort（P0-01 舒適模式預設開啟）。
+    let currentVisualMode = 'comfort';
+    // 蛇頭方向標記網格（P0-03）。
+    let headDirectionMarker = null;
+
+    // 套用指定視覺模式到場景現有物件。
+    function applyVisualProfile(mode) {
+      const p = VISUAL_PROFILES[mode] || VISUAL_PROFILES.comfort;
+      currentVisualMode = mode;
+
+      if (scene) {
+        scene.background = new THREE.Color(p.sceneBg);
+        scene.fog = new THREE.FogExp2(p.sceneBg, p.fogDensity);
+        renderer.toneMappingExposure = p.toneMappingExposure;
+      }
+      if (scene && scene.children) {
+        const ambient = scene.children.find(c => c.isAmbientLight);
+        if (ambient) ambient.intensity = p.ambientIntensity;
+      }
+      const headLight = scene ? scene.getObjectByName('headLight') : null;
+      if (headLight) {
+        headLight.intensity = p.headPointLightIntensity;
+        headLight.range = p.headPointLightRange;
+      }
+      if (scene) {
+        scene.traverse(obj => {
+          if (!obj.material) return;
+          if (obj.material.isMeshStandardMaterial) {
+            // 邊框（紅）與立柱（青）透過 emissive 色與強度辨認。
+            if (obj.material.emissive && obj.material.emissive.r > 0.8 && obj.material.emissive.g < 0.2 && obj.material.emissive.b < 0.3) {
+              obj.material.emissive = new THREE.Color(p.borderEmissive);
+              obj.material.emissiveIntensity = p.borderEmissiveIntensity;
+            } else if (obj.material.emissive && obj.material.emissive.g > 0.8 && obj.material.emissive.b > 0.6) {
+              obj.material.emissive = new THREE.Color(p.pillarEmissive);
+              obj.material.emissiveIntensity = p.pillarEmissiveIntensity;
+            }
+          }
+        });
+      }
+      // 發光網格。
+      if (scene) {
+        scene.traverse(obj => {
+          if (obj.material && obj.material.isGridHelper) {
+            obj.material.color = new THREE.Color(p.gridColor);
+          }
+        });
+      }
+      // 食物水晶。
+      if (foodMesh && foodMesh.material) {
+        foodMesh.material.emissive = new THREE.Color(p.foodEmissive);
+        foodMesh.material.emissiveIntensity = p.foodEmissiveIntensity;
+      }
+      if (foodLight) {
+        foodLight.intensity = p.foodLightIntensity;
+      }
+      // bloom。
+      if (bloomPass) {
+        bloomPass.strength = p.bloomStrength;
+        bloomPass.threshold = p.bloomThreshold;
+      }
+      // 蛇頭材質與方向標記。
+      if (snakeBodyMeshes && snakeBodyMeshes.length > 0) {
+        const head = snakeBodyMeshes[0];
+        if (head && head.material) {
+          head.material.color = new THREE.Color(p.headColor);
+          head.material.emissive = new THREE.Color(p.headEmissive);
+          head.material.emissiveIntensity = p.headEmissiveIntensity;
+        }
+      }
+      // 更新方向標記顏色。
+      if (headDirectionMarker && headDirectionMarker.material) {
+        headDirectionMarker.material.color = new THREE.Color(p.directionMarkerColor);
+      }
+    }
 
     // ==========================================
     // 1. 頂級音效與三大主題音樂合成器 (純 Web Audio API)
@@ -534,10 +701,10 @@
     const BOUNDARY = GRID_SIZE / 2; // 50
     const INITIAL_SPEED = 180; 
     const SPEED_DECREMENT = 4; 
-    const MIN_SPEED = 70; 
+    const MIN_SPEED = 70;
 
     // 檢測是否為手機或平板裝置 (自動調降負載以確保 60 FPS)
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
+    // isMobileDevice 已在檔案頂部宣告，此處移除重複宣告。
 
     let gameInterval = null;
     let gameSpeed = INITIAL_SPEED;
@@ -732,6 +899,9 @@
       const outputPass = new OutputPass();
       composer.addPass(outputPass);
 
+      // P0-02：場景建立後套用目前視覺模式（預設 comfort）。
+      applyVisualProfile(currentVisualMode);
+
       // 監聽視窗調整
       window.addEventListener('resize', onWindowResize);
     }
@@ -853,12 +1023,15 @@
       const isHead = index === 0;
       let geo, mat;
 
+      // 讀取目前視覺模式的蛇頭參數（P0-02/P0-03）。
+      const p = VISUAL_PROFILES[currentVisualMode] || VISUAL_PROFILES.comfort;
+
       if (isHead) {
-        geo = new THREE.SphereGeometry(0.85, isMobileDevice ? 16 : 32, isMobileDevice ? 16 : 32); // 行動端優化細分面
+        geo = new THREE.SphereGeometry(p.headRadius, isMobileDevice ? 16 : 32, isMobileDevice ? 16 : 32); // 行動端優化細分面
         mat = new THREE.MeshStandardMaterial({
-          color: 0x00ffcc,
-          emissive: 0x00ffcc,
-          emissiveIntensity: 2.2,
+          color: new THREE.Color(p.headColor),
+          emissive: new THREE.Color(p.headEmissive),
+          emissiveIntensity: p.headEmissiveIntensity,
           roughness: 0.1,
           metalness: 0.9
         });
@@ -866,9 +1039,9 @@
         const scale = Math.max(0.4, 0.8 * Math.pow(0.96, index));
         geo = new THREE.SphereGeometry(scale, isMobileDevice ? 8 : 16, isMobileDevice ? 8 : 16);
         
-        const segmentColor = new THREE.Color();
+        const segmentColor = new THREE.Color(p.bodyColorStart);
         const ratio = Math.min(index / 20, 1.0);
-        segmentColor.lerpColors(new THREE.Color(0x00ffcc), new THREE.Color(0x9900ff), ratio);
+        segmentColor.lerpColors(segmentColor, new THREE.Color(0x9900ff), ratio);
 
         mat = new THREE.MeshStandardMaterial({
           color: segmentColor,
@@ -892,6 +1065,23 @@
         rightEye.position.set(-0.38, 0.35, -0.5);
 
         mesh.add(leftEye, rightEye);
+
+        // P0-03：蛇頭方向標記——頭頂方向箭頭（weathervane）。
+        // 作為蛇頭子物件，隨蛇頭旋轉而指向前進方向（眼睛與箭頭共同指示前方），
+        // 讓玩家以形状辨識方向，不再依賴整顆發白。擺在頭頂上方， elevate chase camera 下清晰可見。
+        const markerGeo = new THREE.ConeGeometry(0.26, 0.6, 8);
+        const markerMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(p.directionMarkerColor),
+          emissive: new THREE.Color(p.directionMarkerColor),
+          emissiveIntensity: 0.9,
+          roughness: 0.3,
+          metalness: 0.6
+        });
+        headDirectionMarker = new THREE.Mesh(markerGeo, markerMat);
+        // 旋轉使錐尖朝蛇頭前方（-Z 局部座標），並擺在頭正上方。
+        headDirectionMarker.rotation.x = -Math.PI / 2;
+        headDirectionMarker.position.set(0, p.headRadius + 0.45, 0);
+        mesh.add(headDirectionMarker);
       }
 
       return mesh;
@@ -991,13 +1181,15 @@
 
         createExplosion(foodMesh.position);
 
-        gsap.fromTo(bloomPass, 
-          { strength: isMobileDevice ? 2.5 : 3.5 }, 
-          { strength: isMobileDevice ? 1.0 : 1.5, duration: 0.8, ease: "power2.out" }
+        // P0-04：comfort 模式減弱進食 bloom 強閃與 FOV pulse。
+        const p = VISUAL_PROFILES[currentVisualMode] || VISUAL_PROFILES.comfort;
+        gsap.fromTo(bloomPass,
+          { strength: bloomPass.strength },
+          { strength: p.eatBloomPulse, duration: 0.8, ease: "power2.out" }
         );
 
         gsap.to(camera, {
-          fov: 62,
+          fov: p.eatFovPulse,
           duration: 0.1,
           yoyo: true,
           repeat: 1,
@@ -1081,6 +1273,8 @@
           headLight.position.copy(headMesh.position);
           headLight.position.y = 1.8;
         }
+
+        // 蛇頭方向標記（P0-03）為蛇頭子物件，隨蛇頭旋轉自動指向前進方向。
 
         // ==========================================
         // 5. 賽博朋克運鏡 (配合場地放大，重新定位偏移量)
@@ -1181,10 +1375,14 @@
         localStorage.setItem('cyber_snake_best', bestScore);
       }
 
+      // P0-04：comfort 模式大幅降低 camera shake 幅度（從 8 降到 profile 值）。
+      const p = VISUAL_PROFILES[currentVisualMode] || VISUAL_PROFILES.comfort;
+      const shakeRange = p.cameraShakeRange;
+
       gsap.to(camera.position, {
-        x: camera.position.x + (Math.random() - 0.5) * 8,
-        y: camera.position.y + 5,
-        z: camera.position.z + 10,
+        x: camera.position.x + (Math.random() - 0.5) * shakeRange,
+        y: camera.position.y + shakeRange * 0.6,
+        z: camera.position.z + shakeRange * 1.2,
         duration: 0.08,
         repeat: 6,
         yoyo: true,
@@ -1196,8 +1394,9 @@
           document.getElementById('gameover-screen').classList.remove('hidden');
         }
       });
-      
-      gsap.to(bloomPass, { strength: 4.8, duration: 0.1, yoyo: true, repeat: 1 });
+
+      // P0-04：comfort 模式降低 game-over bloom 強閃幅度。
+      gsap.to(bloomPass, { strength: p.gameOverBloomPulse, duration: 0.1, yoyo: true, repeat: 1 });
     }
 
     // ==========================================
@@ -1360,6 +1559,25 @@
             </svg>
             <span class="hidden sm:inline">相機: 追蹤</span>`;
         }
+      });
+
+      // P0-05：視覺舒適模式切換（comfort ↔ neon）。
+      const btnVisual = document.getElementById('btn-visual-mode');
+      btnVisual.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        sfx.playSelect();
+        const nextMode = currentVisualMode === 'comfort' ? 'neon' : 'comfort';
+        currentVisualMode = nextMode;
+        applyVisualProfile(nextMode);
+        // 更新按鈕文字與狀態。
+        const on = nextMode === 'comfort';
+        btnVisual.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m6.364.386l-1.591 1.591M18 12h-2.25M5.636 13.591l-1.591-1.591M12 18.75l.02.25m-9.518-6.59l2.09-.52M12 21.75H9.75M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
+          </svg>
+          <span class="hidden sm:inline">舒適模式: ${on ? '開' : '關'}</span>
+          <span class="sm:hidden">${on ? '舒適' : '霓虹'}</span>`;
+        btnVisual.classList.toggle('opacity-50', !on);
       });
 
       // 監聽鍵盤與觸控
