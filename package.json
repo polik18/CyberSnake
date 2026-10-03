@@ -1,0 +1,25 @@
+{
+  "name": "cybersnake",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CyberSnake — cyberpunk snake game (GitHub Pages)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:unit": "vitest run",
+    "test:browser": "playwright test",
+    "test:visual": "playwright test --grep visual",
+    "test:regression": "playwright test --grep regression",
+    "screenshot": "playwright run-screenshot",
+    "lint": "node scripts/lint.mjs",
+    "audit:network": "playwright test --grep network"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "pngjs": "^7.0.0",
+    "vite": "^6.3.0",
+    "vitest": "^3.2.0"
+  }
+}

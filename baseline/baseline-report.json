@@ -1,0 +1,27 @@
+{
+  "tool": "cybersnake-baseline",
+  "generatedAt": "2026-10-03T03:53:08.051Z",
+  "baseCommit": "d6f1091",
+  "results": [
+    {
+      "label": "desktop",
+      "width": 1440,
+      "height": 900,
+      "mode": "game",
+      "screenshot": "baseline/desktop-game.png",
+      "saturatedRatio": 22.462,
+      "whiteHighlightRatio": 1.03,
+      "capturedAt": "2026-10-03T03:52:54.815Z"
+    },
+    {
+      "label": "mobile",
+      "width": 390,
+      "height": 844,
+      "mode": "game",
+      "screenshot": "baseline/mobile-game.png",
+      "saturatedRatio": 5.91,
+      "whiteHighlightRatio": 0.269,
+      "capturedAt": "2026-10-03T03:53:08.050Z"
+    }
+  ]
+}

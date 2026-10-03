@@ -1,0 +1,22 @@
+{
+  "tool": "cybersnake-phase0-baseline",
+  "generatedAt": "2026-10-03T05:00:00.000Z",
+  "baseCommit": "d6f1091",
+  "note": "before/after visual comfort metrics. Desktop baseline captured from original code (git stash); mobile baseline captured from original code at fixed early in-game frame (before ~4.3s wall-crash). comfort profile calibrated to plan P0-02 ranges.",
+  "results": [
+    { "label": "desktop", "width": 1440, "height": 900, "mode": "game", "phase": "baseline-original", "screenshot": "baseline/desktop-game.png", "saturatedRatio": 22.462, "whiteHighlightRatio": 1.03 },
+    { "label": "desktop", "width": 1440, "height": 900, "mode": "game", "phase": "after-comfort", "screenshot": "after-cal/desktop-game.png", "saturatedRatio": 2.183, "whiteHighlightRatio": 0.113 },
+    { "label": "mobile", "width": 390, "height": 844, "mode": "game", "phase": "baseline-original", "screenshot": "baseline/mobile-game.png", "saturatedRatio": 11.921, "whiteHighlightRatio": 0.926 },
+    { "label": "mobile", "width": 390, "height": 844, "mode": "game", "phase": "after-comfort", "screenshot": "after-cal/mobile-game.png", "saturatedRatio": 1.374, "whiteHighlightRatio": 0.178 }
+  ],
+  "comparison": {
+    "desktop": { "saturatedBefore": 22.462, "saturatedAfter": 2.183, "reductionPct": 90.3, "whiteBefore": 1.03, "whiteAfter": 0.113 },
+    "mobile": { "saturatedBefore": 11.921, "saturatedAfter": 1.374, "reductionPct": 88.4, "whiteBefore": 0.926, "whiteAfter": 0.178 }
+  },
+  "acceptance": {
+    "saturated60pctLower": { "desktop": true, "mobile": true },
+    "strongFlashZero": { "comfortGameOverBloom": 1.2, "target": "no 4.8/3.5 white flash" },
+    "headOrientDistinguishable": true,
+    "controlsNoRegression": true
+  }
+}
