@@ -270,6 +270,11 @@
     // 行動裝置偵測（P0 視覺模式需在此時決定）。
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
 
+    // P0-04：偵測作業系統 prefers-reduced-motion，使用者偏好低動態時關閉
+    // camera shake、FOV pulse 與強烈 bloom pulse（驗收門檻：reduced-motion 下為 0）。
+    const prefersReducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // ==========================================
     // 0. 視覺舒適度設定 (Phase 0: P0-02 集中設定)
     // ==========================================
@@ -1181,15 +1186,18 @@
 
         createExplosion(foodMesh.position);
 
-        // P0-04：comfort 模式減弱進食 bloom 強閃與 FOV pulse。
+        // P0-04：comfort 模式減弱進食 bloom 強閃與 FOV pulse；
+        // reduced-motion 模式下完全關閉（pulse 幅度為 0，不改變基礎強度）。
         const p = VISUAL_PROFILES[currentVisualMode] || VISUAL_PROFILES.comfort;
+        const eatBloomTarget = prefersReducedMotion ? bloomPass.strength : p.eatBloomPulse;
+        const eatFovTarget = prefersReducedMotion ? camera.fov : p.eatFovPulse;
         gsap.fromTo(bloomPass,
           { strength: bloomPass.strength },
-          { strength: p.eatBloomPulse, duration: 0.8, ease: "power2.out" }
+          { strength: eatBloomTarget, duration: 0.8, ease: "power2.out" }
         );
 
         gsap.to(camera, {
-          fov: p.eatFovPulse,
+          fov: eatFovTarget,
           duration: 0.1,
           yoyo: true,
           repeat: 1,
@@ -1375,9 +1383,10 @@
         localStorage.setItem('cyber_snake_best', bestScore);
       }
 
-      // P0-04：comfort 模式大幅降低 camera shake 幅度（從 8 降到 profile 值）。
+      // P0-04：comfort 模式大幅降低 camera shake 幅度（從 8 降到 profile 值）；
+      // reduced-motion 模式下 camera shake 幅度為 0（驗收門檻）。
       const p = VISUAL_PROFILES[currentVisualMode] || VISUAL_PROFILES.comfort;
-      const shakeRange = p.cameraShakeRange;
+      const shakeRange = prefersReducedMotion ? 0 : p.cameraShakeRange;
 
       gsap.to(camera.position, {
         x: camera.position.x + (Math.random() - 0.5) * shakeRange,
@@ -1395,8 +1404,9 @@
         }
       });
 
-      // P0-04：comfort 模式降低 game-over bloom 強閃幅度。
-      gsap.to(bloomPass, { strength: p.gameOverBloomPulse, duration: 0.1, yoyo: true, repeat: 1 });
+      // P0-04：comfort 模式降低 game-over bloom 強閃幅度；reduced-motion 下為 0。
+      const gameOverBloomTarget = prefersReducedMotion ? bloomPass.strength : p.gameOverBloomPulse;
+      gsap.to(bloomPass, { strength: gameOverBloomTarget, duration: 0.1, yoyo: true, repeat: 1 });
     }
 
     // ==========================================
