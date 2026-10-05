@@ -267,6 +267,12 @@
     import { UnrealBloomPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/UnrealBloomPass.js';
     import { OutputPass } from 'https://esm.sh/three@0.156.0/examples/jsm/postprocessing/OutputPass.js';
 
+    // Phase 1：純、確定性遊戲引擎（與 worker 重播驗證 API 共用同一來源）。
+    import { GAME_CONFIG, initialGameState } from './src/config/game-config.js';
+    import { createSeededRng } from './src/game/prng.js';
+    import * as engine from './src/game/engine.js';
+    const { resetGame: engineResetGame } = engine;
+
     // 行動裝置偵測（P0 視覺模式需在此時決定）。
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
 
@@ -720,12 +726,15 @@
     let crystalsEaten = 0;
     let maxMultiplier = 1;
     let currentMultiplier = 1;
-    let comboTimeLeft = 0; 
+    let comboTimeLeft = 0;
     let comboTimer = null;
 
-    // 蛇的邏輯定位陣列
-    let snakeLogical = []; 
-    
+    // Phase 1 確定性遊戲狀態（與 worker 重播器共用 pure engine）。
+    // gameState 為引擎狀態物件；gameSeed/gameRng 驅動食物生成（criterion #3）。
+    let gameState = null;
+    let gameSeed = 0;
+    let gameRng = null;
+
     // 相對轉向方向系統 (上 -> 右 -> 下 -> 左，依順時針排列)
     const DIRS = [
       { x: 0, z: -GRID_STEP },  // Index 0: 向上 (North)
@@ -733,9 +742,6 @@
       { x: 0, z: GRID_STEP },   // Index 2: 向下 (South)
       { x: -GRID_STEP, z: 0 }   // Index 3: 向左 (West)
     ];
-
-    let direction = { x: 0, z: -GRID_STEP }; // 預設朝上
-    let inputDirectionQueue = []; // 方向指令輸入緩衝佇列
 
     // 3D 關聯物件
     let scene, camera, renderer, composer, bloomPass;
@@ -989,39 +995,72 @@
     // ==========================================
     // 5. 遊戲邏輯控制與重置
     // ==========================================
+    // Phase 1：從 gameState（pure engine）同步蛇身 mesh 與食物 mesh。
+    // 前端不再维护 snakeLogical/direction 副本，全部讀自 gameState 以保
+    // 前端與 worker 重播器產生相同 snapshot hash（criterion #1）。
+    function syncSnakeMeshes() {
+      const segs = gameState.snake;
+      // 確保 mesh 數量與 segment 數一致。
+      while (snakeBodyMeshes.length < segs.length) {
+        const mesh = createSnakeSegment(snakeBodyMeshes.length);
+        mesh.position.set(0, 0, 0);
+        scene.add(mesh);
+        snakeBodyMeshes.push(mesh);
+      }
+      for (let i = 0; i < segs.length; i++) {
+        const mesh = snakeBodyMeshes[i];
+        mesh.position.set(segs[i].x, 0, segs[i].z);
+      }
+      // 若蛇縮短（吃食物前的 pop 尚未發生，通常不會縮），移除多餘 mesh。
+      while (snakeBodyMeshes.length > segs.length) {
+        const m = snakeBodyMeshes.pop();
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) m.material.dispose();
+      }
+    }
+
     function resetGame() {
+      // Phase 1：重置 pure engine 狀態（criterion #1/#2/#3）。
+      // 食物生成改用 seeded PRNG（createSeededRng），不再用 Math.random()。
       score = 0;
       crystalsEaten = 0;
       currentMultiplier = 1;
       maxMultiplier = 1;
       comboTimeLeft = 0;
       gameSpeed = INITIAL_SPEED;
-      direction = { x: 0, z: -GRID_STEP }; 
-      inputDirectionQueue = []; 
-
+      if (comboTimer) { clearInterval(comboTimer); comboTimer = null; }
+      gameSeed = Math.floor(Math.random() * 1000000);
+      gameRng = createSeededRng(gameSeed);
+      gameState = engineResetGame(initialGameState(), gameRng);
+      // 初始蛇身由 engine state 決定，同步 mesh。
+      syncSnakeMeshes();
+      // 食物由 engine 生成（spawnFood 消耗 PRNG）；同步食物 mesh。
+      spawnFoodFromState(gameState.food);
       document.getElementById('score').innerText = '0000';
       document.getElementById('multiplier').innerText = 'x1';
       document.getElementById('combo-bar').style.width = '0%';
+    }
 
-      // 清除舊的蛇身
-      snakeBodyMeshes.forEach(mesh => scene.remove(mesh));
-      snakeBodyMeshes = [];
+    // 由 engine food 狀態同步食物 mesh 位置與 spawn 動畫（criterion #3：seeded PRNG）。
+    // food=null 時隱藏 mesh（與 worker runReplay 一致：食物由引擎在下一 tick 內部重生）。
+    function spawnFoodFromState(foodPos) {
+      if (!foodPos) {
+        if (foodMesh) foodMesh.visible = false;
+        if (foodLight) foodLight.visible = false;
+        return;
+      }
+      const rx = foodPos.x;
+      const rz = foodPos.z;
+      foodMesh.position.set(rx, 0, rz);
+      foodLight.position.set(rx, 2, rz);
+      foodMesh.visible = true;
+      foodLight.visible = true;
 
-      snakeLogical = [
-        { x: 0, z: 0 },
-        { x: 0, z: GRID_STEP },
-        { x: 0, z: GRID_STEP * 2 },
-        { x: 0, z: GRID_STEP * 3 }
-      ];
-
-      snakeLogical.forEach((pos, idx) => {
-        const mesh = createSnakeSegment(idx);
-        mesh.position.set(pos.x, 0, pos.z);
-        scene.add(mesh);
-        snakeBodyMeshes.push(mesh);
-      });
-
-      spawnFood();
+      gsap.fromTo(foodMesh.scale,
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 1, z: 1, duration: 0.6, ease: "back.out(2)" }
+      );
     }
 
     function createSnakeSegment(index) {
@@ -1092,49 +1131,19 @@
       return mesh;
     }
 
-    function spawnFood() {
-      let valid = false;
-      let rx, rz;
-
-      while (!valid) {
-        const maxRangeFactor = Math.floor((BOUNDARY - 4) / GRID_STEP); 
-        const factorX = Math.floor(Math.random() * (maxRangeFactor * 2 + 1)) - maxRangeFactor;
-        const factorZ = Math.floor(Math.random() * (maxRangeFactor * 2 + 1)) - maxRangeFactor;
-
-        rx = factorX * GRID_STEP;
-        rz = factorZ * GRID_STEP;
-
-        valid = !snakeLogical.some(segment => segment.x === rx && segment.z === rz);
-      }
-
-      foodMesh.position.set(rx, 0, rz);
-      foodLight.position.set(rx, 2, rz);
-
-      gsap.fromTo(foodMesh.scale, 
-        { x: 0, y: 0, z: 0 }, 
-        { x: 1, y: 1, z: 1, duration: 0.6, ease: "back.out(2)" }
-      );
-    }
-
+    // Phase 1：combo/multiplier 由 engine.step 更新 gameState，此處只同步 UI。
+    // engine.step 吃到食物時已調 advanceCombo（set comboTimeLeft=100、
+    // currentMultiplier=max(.,2)），前端不再用 setInterval 衰減。
     function startComboTimer() {
-      if (comboTimer) clearInterval(comboTimer);
-      comboTimeLeft = 100;
-
-      comboTimer = setInterval(() => {
-        if (!isGameRunning || isPaused) return;
-        
-        comboTimeLeft -= 1.5; 
-        if (comboTimeLeft <= 0) {
-          comboTimeLeft = 0;
-          currentMultiplier = 1;
-          document.getElementById('multiplier').innerText = 'x1';
-          document.getElementById('multiplier').classList.remove('neon-text-pink');
-          document.getElementById('combo-bar').style.width = '0%';
-          clearInterval(comboTimer);
-        } else {
-          document.getElementById('combo-bar').style.width = `${comboTimeLeft}%`;
-        }
-      }, 50);
+      currentMultiplier = gameState.currentMultiplier;
+      comboTimeLeft = gameState.comboTimeLeft;
+      const elMult = document.getElementById('multiplier');
+      if (elMult) {
+        elMult.innerText = `x${currentMultiplier}`;
+        if (currentMultiplier >= 2) elMult.classList.add('neon-text-pink');
+      }
+      const elCombo = document.getElementById('combo-bar');
+      if (elCombo) elCombo.style.width = `${Math.max(0, comboTimeLeft)}%`;
     }
 
     // ==========================================
@@ -1143,51 +1152,32 @@
     function gameTick() {
       if (!isGameRunning || isPaused) return;
 
-      if (inputDirectionQueue.length > 0) {
-        direction = inputDirectionQueue.shift();
-      }
+      // Phase 1：pure engine 驅動一 tick。engine.turn 由 turnRelative 每
+      // 次輸入推入 state.inputQueue（≤ MAX_INPUT_QUEUE），engine.step 每
+      // tick 彈出一個 turn 並推進蛇身（criterion #1/#2：與 worker 序列一致）。
+      // engine.step 為純函數，回傳 { state, events }；前端接回新 state。
+      const crystalsBefore = gameState.crystalsEaten;
+      const { state: newState, events } = engine.step(gameState);
+      gameState = newState;
 
-      const oldHead = snakeLogical[0];
-      const newHead = {
-        x: oldHead.x + direction.x,
-        z: oldHead.z + direction.z
-      };
-
-      if (Math.abs(newHead.x) > BOUNDARY || Math.abs(newHead.z) > BOUNDARY) {
+      // 撞牆／自身碰撞／速度更新皆由 engine.step 回傳的 gameOver 狀態反映。
+      if (gameState.gameOver) {
         gameOver();
         return;
       }
 
-      for (let i = 0; i < snakeLogical.length - 1; i++) {
-        if (snakeLogical[i].x === newHead.x && snakeLogical[i].z === newHead.z) {
-          gameOver();
-          return;
-        }
-      }
-
-      snakeLogical.unshift(newHead);
-
-      if (newHead.x === foodMesh.position.x && newHead.z === foodMesh.position.z) {
-        sfx.playEat();
-        crystalsEaten++;
-
-        startComboTimer();
-        score += 10 * currentMultiplier;
+      // 吃到食物：crystalsEaten 增加。同步 score/crystals/speed/UI + 特效。
+      if (events.includes('ate') || gameState.crystalsEaten > crystalsBefore) {
+        score = gameState.score;
+        crystalsEaten = gameState.crystalsEaten;
+        currentMultiplier = gameState.currentMultiplier;
         document.getElementById('score').innerText = String(score).padStart(4, '0');
+        startComboTimer();
 
-        if (currentMultiplier < 5) {
-          currentMultiplier++;
-          document.getElementById('multiplier').innerText = `x${currentMultiplier}`;
-          document.getElementById('multiplier').classList.add('neon-text-pink');
-          if (currentMultiplier > maxMultiplier) {
-            maxMultiplier = currentMultiplier;
-          }
-        }
+        // 進食特效：爆炸 + bloom/FOV pulse（P0-04）。
+        const foodPos = foodMesh ? foodMesh.position : new THREE.Vector3(0, 0, 0);
+        createExplosion(foodPos);
 
-        createExplosion(foodMesh.position);
-
-        // P0-04：comfort 模式減弱進食 bloom 強閃與 FOV pulse；
-        // reduced-motion 模式下完全關閉（pulse 幅度為 0，不改變基礎強度）。
         const p = VISUAL_PROFILES[currentVisualMode] || VISUAL_PROFILES.comfort;
         const eatBloomTarget = prefersReducedMotion ? bloomPass.strength : p.eatBloomPulse;
         const eatFovTarget = prefersReducedMotion ? camera.fov : p.eatFovPulse;
@@ -1204,22 +1194,19 @@
           onUpdate: () => camera.updateProjectionMatrix()
         });
 
+        // 新增一節蛇身 mesh：置於舊尾端位置，之後由 animate 向前插值。
         const newSegIndex = snakeBodyMeshes.length;
         const newSegMesh = createSnakeSegment(newSegIndex);
         const lastSegPos = snakeBodyMeshes[snakeBodyMeshes.length - 1].position;
         newSegMesh.position.copy(lastSegPos);
         scene.add(newSegMesh);
         snakeBodyMeshes.push(newSegMesh);
-
-        spawnFood();
-
-        gameSpeed = Math.max(MIN_SPEED, INITIAL_SPEED - (crystalsEaten * SPEED_DECREMENT));
-        clearInterval(gameInterval);
-        gameInterval = setInterval(gameTick, gameSpeed);
-
-      } else {
-        snakeLogical.pop();
       }
+
+      // 速度隨 crystals 遞減（與 engine.currentSpeed 一致）。
+      gameSpeed = Math.max(MIN_SPEED, INITIAL_SPEED - (crystalsEaten * SPEED_DECREMENT));
+      clearInterval(gameInterval);
+      gameInterval = setInterval(gameTick, gameSpeed);
     }
 
     // ==========================================
@@ -1257,21 +1244,23 @@
       // 3. 更新爆破粒子
       updateExplosionParticles(delta);
 
-      // 4. LERP 平滑跟隨
-      if (snakeBodyMeshes.length > 0 && snakeLogical.length > 0) {
+      // 4. LERP 平滑跟隨（讀自 gameState，criterion #1：與 engine 一致）
+      const segs = gameState.snake;
+      if (snakeBodyMeshes.length > 0 && segs.length > 0) {
         for (let i = 0; i < snakeBodyMeshes.length; i++) {
           const mesh = snakeBodyMeshes[i];
-          const targetPos = snakeLogical[i];
+          const targetPos = segs[i];
 
           if (targetPos) {
-            const lerpFactor = i === 0 ? 0.34 : 0.24; 
+            const lerpFactor = i === 0 ? 0.34 : 0.24;
             mesh.position.lerp(new THREE.Vector3(targetPos.x, 0, targetPos.z), lerpFactor);
           }
         }
 
         // 蛇頭旋轉
+        const dir = gameState.direction;
         const headMesh = snakeBodyMeshes[0];
-        const targetRotY = Math.atan2(direction.x, direction.z);
+        const targetRotY = Math.atan2(dir.x, dir.z);
         let diff = targetRotY - headMesh.rotation.y;
         diff = Math.atan2(Math.sin(diff), Math.cos(diff));
         headMesh.rotation.y += diff * 0.32;
@@ -1288,25 +1277,25 @@
         // 5. 賽博朋克運鏡 (配合場地放大，重新定位偏移量)
         // ==========================================
         if (cameraMode === 'chase') {
-          const offsetDist = 26; 
+          const offsetDist = 26;
           const height = 18;
 
-          if (direction.x > 0) {
+          if (dir.x > 0) {
             targetCameraOffset.set(-offsetDist, height, 0);
-          } else if (direction.x < 0) {
+          } else if (dir.x < 0) {
             targetCameraOffset.set(offsetDist, height, 0);
-          } else if (direction.z > 0) {
+          } else if (dir.z > 0) {
             targetCameraOffset.set(0, height, -offsetDist);
-          } else if (direction.z < 0) {
+          } else if (dir.z < 0) {
             targetCameraOffset.set(0, height, offsetDist);
           }
 
           currentCameraOffset.lerp(targetCameraOffset, 0.04);
-          
+
           const destCamPos = headMesh.position.clone().add(currentCameraOffset);
           camera.position.lerp(destCamPos, 0.08);
 
-          const lookTarget = headMesh.position.clone().add(new THREE.Vector3(direction.x, 0, direction.z).multiplyScalar(2.0));
+          const lookTarget = headMesh.position.clone().add(new THREE.Vector3(dir.x, 0, dir.z).multiplyScalar(2.0));
           const currentLookAt = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
           currentLookAt.lerp(lookTarget, 0.1);
           camera.lookAt(currentLookAt);
@@ -1415,25 +1404,12 @@
     function turnRelative(turnType) {
       if (!isGameRunning || isPaused) return;
 
-      // 取得佇列中最後一個指令；若佇列為空，則以當前方向為基礎
-      const lastDir = inputDirectionQueue.length > 0 ? inputDirectionQueue[inputDirectionQueue.length - 1] : direction;
-
-      // 在 DIRS 陣列中尋找最後方向的 index
-      let currentIndex = DIRS.findIndex(d => d.x === lastDir.x && d.z === lastDir.z);
-      if (currentIndex === -1) currentIndex = 0;
-
-      let nextIndex;
-      if (turnType === 'LEFT') {
-        nextIndex = (currentIndex - 1 + 4) % 4; // 逆時針 90°
-      } else if (turnType === 'RIGHT') {
-        nextIndex = (currentIndex + 1) % 4;  // 順時針 90°
-      }
-
-      const nextDir = DIRS[nextIndex];
-
-      // 限制佇列排程長度最大為 2 (防止多餘按鍵擠爆，並確保靈敏連續過彎)
-      if (inputDirectionQueue.length < 2) {
-        inputDirectionQueue.push(nextDir);
+      // Phase 1：轉向改由 pure engine 驅動，推入 state.inputQueue
+      // （≤ MAX_INPUT_QUEUE，與 worker 重播一致，criterion #1/#2）。
+      // engine.turn 讀 gameState.direction + DIRS 計算相對轉向。
+      const hadRoom = (gameState.inputQueue.length < GAME_CONFIG.MAX_INPUT_QUEUE);
+      if (hadRoom) {
+        engine.turn(gameState, turnType);
         sfx.playTurn(); // 按下瞬間 0 延遲播放轉彎音效
       }
     }

@@ -101,6 +101,12 @@ export function step(state) {
     state = { ...state, direction: state.inputQueue[0], inputQueue: state.inputQueue.slice(1) };
   }
 
+  // Advance the combo timer once per tick so combo decay is driven by the tick
+  // clock (not wall time), keeping the browser and the replay worker identical.
+  // Advance BEFORE food logic so eating resets comboTimeLeft to COMBO_MAX on the
+  // eating tick itself (matching the frontend's startComboTimer reset).
+  state = advanceCombo(state);
+
   const oldHead = state.snake[0];
   const newHead = {
     x: oldHead.x + state.direction.x,
@@ -119,7 +125,7 @@ export function step(state) {
 
   const newState = { ...state, snake: [newHead, ...state.snake] };
 
-  if (newHead.x === state.food.x && newHead.z === state.food.z) {
+  if (state.food && newHead.x === state.food.x && newHead.z === state.food.z) {
     newState.crystalsEaten = state.crystalsEaten + 1;
     newState.score = state.score + SCORE_PER_FOOD * state.currentMultiplier;
     newState.currentMultiplier = Math.min(state.currentMultiplier + 1, MAX_MULTIPLIER);

@@ -33,6 +33,7 @@ export function initialGameState() {
       { x: 0, z: 0 },
       { x: 0, z: GAME_CONFIG.GRID_STEP },
       { x: 0, z: GAME_CONFIG.GRID_STEP * 2 },
+      { x: 0, z: GAME_CONFIG.GRID_STEP * 3 },
     ],
     direction: { x: 0, z: -GAME_CONFIG.GRID_STEP },
     inputQueue: [],

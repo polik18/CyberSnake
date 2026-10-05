@@ -94,7 +94,7 @@ describe('movement and collision', () => {
     const rng = createSeededRng(7);
     let state = resetGame(initialGameState(), rng);
     const { state: next } = step(state);
-    expect(next.snake.length).toBe(3);
+    expect(next.snake.length).toBe(4);
   });
 });
 
@@ -158,6 +158,6 @@ describe('replay integrity', () => {
     const a = deterministicRun(1, []);
     const b = deterministicRun(1, []);
     expect(a).toEqual(b);
-    expect(a.snake.length).toBe(3);
+    expect(a.snake.length).toBe(4);
   });
 });

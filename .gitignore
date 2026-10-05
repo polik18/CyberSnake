@@ -2,3 +2,6 @@ node_modules/
 *.log
 .DS_Store
 /tmp/
+
+# Cloudflare Worker config (contains real D1 id + secrets)
+worker/wrangler.toml
