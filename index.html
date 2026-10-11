@@ -1409,7 +1409,7 @@
       // engine.turn 讀 gameState.direction + DIRS 計算相對轉向。
       const hadRoom = (gameState.inputQueue.length < GAME_CONFIG.MAX_INPUT_QUEUE);
       if (hadRoom) {
-        engine.turn(gameState, turnType);
+        gameState = engine.turn(gameState, turnType);
         sfx.playTurn(); // 按下瞬間 0 延遲播放轉彎音效
       }
     }
