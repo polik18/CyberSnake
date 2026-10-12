@@ -9,12 +9,13 @@ export const GAME_CONFIG = {
   INITIAL_SPEED: 180, // ms per tick
   SPEED_DECREMENT: 4, // ms reduced per crystal eaten
   MIN_SPEED: 70, // fastest tick interval
+  BOOST_SPEED_DECREMENT: 10, // extra ms reduced when boosting
   MAX_INPUT_QUEUE: 2, // max queued turns (from turnRelative guard)
   COMBO_TICK_MS: 50, // combo timer interval
   COMBO_DECAY: 1.5, // comboTimeLeft decremented per combo tick
   COMBO_MAX: 100, // initial comboTimeLeft when food eaten
   MAX_MULTIPLIER: 5, // cap on currentMultiplier
-  SCORE_PER_FOOD: 10, // base score per food (matches score += 10 * multiplier)
+  SCORE_PER_FOOD: 10, // base score per food (matches score += 10 * multiplier),
 };
 
 // Relative direction order: up -> right -> down -> left (clockwise).
@@ -44,5 +45,6 @@ export function initialGameState() {
     currentMultiplier: 1,
     comboTimeLeft: 0,
     gameOver: false,
+    isBoosting: false, // Added for acceleration
   };
 }

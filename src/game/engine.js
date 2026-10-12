@@ -126,17 +126,25 @@ export function step(state) {
   const newState = { ...state, snake: [newHead, ...state.snake] };
 
   if (state.food && newHead.x === state.food.x && newHead.z === state.food.z) {
-    newState.crystalsEaten = state.crystalsEaten + 1;
-    newState.score = state.score + SCORE_PER_FOOD * state.currentMultiplier;
-    newState.currentMultiplier = Math.min(state.currentMultiplier + 1, MAX_MULTIPLIER);
-    if (newState.currentMultiplier > newState.maxMultiplier) {
-      newState.maxMultiplier = newState.currentMultiplier;
+    const nextState = { ...state };
+    nextState.crystalsEaten = state.crystalsEaten + 1;
+    nextState.score = state.score + SCORE_PER_FOOD * state.currentMultiplier;
+    nextState.currentMultiplier = Math.min(state.currentMultiplier + 1, MAX_MULTIPLIER);
+    if (nextState.currentMultiplier > nextState.maxMultiplier) {
+      nextState.maxMultiplier = nextState.currentMultiplier;
     }
-    newState.comboTimeLeft = COMBO_MAX;
-    newState.food = null; // will be repopulated by spawnFood()
+    nextState.comboTimeLeft = COMBO_MAX;
+    
+    // Correctly spawn new food using the updated state (with food set to null)
+    const { food: newFood } = spawnFood({ ...nextState, food: null }, state.rng);
+    nextState.food = newFood;
+    
     events.push('ate');
+    // Return the state without removing the tail (growth)
+    return { state: nextState, events };
   } else {
-    newState.snake = newState.snake.slice(0, -1); // pop tail (no growth)
+    const nextState = { ...state, snake: state.snake.slice(0, -1) };
+    return { state: nextState, events };
   }
 
   return { state: newState, events };
@@ -151,7 +159,11 @@ export function advanceComboTimer(state) {
 // Compute the tick interval (ms) for the current crystal count.
 // Ported from the setInterval(gameTick, gameSpeed) re-scheduling.
 export function currentSpeed(state) {
-  return Math.max(MIN_SPEED, INITIAL_SPEED - state.crystalsEaten * SPEED_DECREMENT);
+  let speed = Math.max(MIN_SPEED, INITIAL_SPEED - state.crystalsEaten * SPEED_DECREMENT);
+  if (state.isBoosting) {
+    speed = Math.max(MIN_SPEED, speed - BOOST_SPEED_DECREMENT);
+  }
+  return speed;
 }
 
 // Reset a game to its deterministic initial state, then spawn the first food
