@@ -101,10 +101,6 @@ export function step(state) {
     state = { ...state, direction: state.inputQueue[0], inputQueue: state.inputQueue.slice(1) };
   }
 
-  // Advance the combo timer once per tick so combo decay is driven by the tick
-  // clock (not wall time), keeping the browser and the replay worker identical.
-  // Advance BEFORE food logic so eating resets comboTimeLeft to COMBO_MAX on the
-  // eating tick itself (matching the frontend's startComboTimer reset).
   state = advanceCombo(state);
 
   const oldHead = state.snake[0];
@@ -113,41 +109,44 @@ export function step(state) {
     z: oldHead.z + state.direction.z,
   };
 
+  // 1. 牆壁碰撞
   if (Math.abs(newHead.x) > BOUNDARY || Math.abs(newHead.z) > BOUNDARY) {
     return { state: { ...state, gameOver: true }, events: [...events, 'gameOver'] };
   }
 
+  // 2. 自身碰撞
   for (let i = 0; i < state.snake.length - 1; i++) {
     if (state.snake[i].x === newHead.x && state.snake[i].z === newHead.z) {
       return { state: { ...state, gameOver: true }, events: [...events, 'gameOver'] };
     }
   }
 
-  const newState = { ...state, snake: [newHead, ...state.snake] };
-
-  if (state.food && newHead.x === state.food.x && newHead.z === state.food.z) {
-    const nextState = { ...state };
-    nextState.crystalsEaten = state.crystalsEaten + 1;
-    nextState.score = state.score + SCORE_PER_FOOD * state.currentMultiplier;
-    nextState.currentMultiplier = Math.min(state.currentMultiplier + 1, MAX_MULTIPLIER);
-    if (nextState.currentMultiplier > nextState.maxMultiplier) {
-      nextState.maxMultiplier = nextState.currentMultiplier;
-    }
-    nextState.comboTimeLeft = COMBO_MAX;
+  // 3. 處理移動與食物
+  let nextState;
+  
+  if (currentState.food && newHead.x === currentState.food.x && newHead.z === currentState.food.z) {
+    // 吃到了食物：保留尾部（變長）
+    const updatedData = {
+      ...currentState,
+      crystalsEaten: currentState.crystalsEaten + 1,
+      score: currentState.score + SCORE_PER_FOOD * currentState.currentMultiplier,
+      currentMultiplier: Math.min(currentState.currentMultiplier + 1, MAX_MULTIPLIER),
+      comboTimeLeft: COMBO_MAX,
+      snake: [newHead, ...currentState.snake]
+    };
     
-    // Correctly spawn new food using the updated state (with food set to null)
-    const { food: newFood } = spawnFood({ ...nextState, food: null }, state.rng);
-    nextState.food = newFood;
-    
+    const { food: newFood } = spawnFood({ ...updatedData, food: null }, currentState.rng);
+    nextState = { ...updatedData, food: newFood };
     events.push('ate');
-    // Return the state without removing the tail (growth)
-    return { state: nextState, events };
   } else {
-    const nextState = { ...state, snake: state.snake.slice(0, -1) };
-    return { state: nextState, events };
+    // 沒吃到食物：移除尾部
+    nextState = {
+      ...currentState,
+      snake: [newHead, ...currentState.snake.slice(0, -1)]
+    };
   }
 
-  return { state: newState, events };
+  return { state: nextState, events };
 }
 
 // Advance the combo timer by one combo tick (ported from startComboTimer's
